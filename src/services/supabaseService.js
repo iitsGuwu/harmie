@@ -1,15 +1,13 @@
-// Supabase Service — Votes, ELO rankings, fingerprint-based identity
+// Supabase Service — votes and ELO; voter identity is Supabase Auth (anonymous or signed-in).
 import { createClient } from '@supabase/supabase-js';
 import { CONFIG } from '../config.js';
-import { generateFingerprint } from './fingerprint.js';
 import { devLog, devWarn } from '../utils/dom.js';
 
 let supabase = null;
-let currentVoterId = null;
-let fingerprint = null;
 let lastVoteTime = 0;
 let isInitialized = false;
-let upsertRpcAvailable = true;
+/** True after we have a persisted Supabase session (anonymous is enough). */
+let authSessionReady = false;
 
 export async function initSupabase() {
   if (isInitialized) return true;
@@ -21,41 +19,47 @@ export async function initSupabase() {
 
   try {
     supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
     });
 
-    fingerprint = await generateFingerprint();
+    const {
+      data: { session: existing },
+    } = await supabase.auth.getSession();
 
-    let storedSalt = localStorage.getItem('harmies_salt');
-    if (!storedSalt) {
-      storedSalt = crypto.randomUUID
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2) + Date.now().toString(36);
-      localStorage.setItem('harmies_salt', storedSalt);
+    if (!existing) {
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) {
+        devWarn('Anonymous sign-in failed:', error.message);
+        devWarn('Enable Anonymous sign-ins in Supabase Auth → Providers.');
+        supabase = null;
+        return false;
+      }
     }
 
-    currentVoterId = localStorage.getItem('harmies_voter_id');
-    if (!currentVoterId) {
-      const raw = `${fingerprint}_${storedSalt}`;
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(raw));
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      currentVoterId =
-        'v_' + hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
-      localStorage.setItem('harmies_voter_id', currentVoterId);
-    }
-
+    authSessionReady = true;
     isInitialized = true;
-    devLog('Supabase initialized');
+    devLog('Supabase initialized (auth session ready)');
     return true;
   } catch (err) {
     devWarn('Supabase init error:', err);
+    supabase = null;
     return false;
   }
 }
 
 export async function submitVote(winnerId, loserId) {
-  if (!supabase || !currentVoterId) return null;
+  if (!supabase || !authSessionReady) return null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user?.id) {
+    return { error: 'Still connecting — try again in a moment.' };
+  }
 
   const now = Date.now();
   if (now - lastVoteTime < CONFIG.VOTE_COOLDOWN_MS) {
@@ -64,14 +68,15 @@ export async function submitVote(winnerId, loserId) {
 
   try {
     const { data, error } = await supabase.rpc('submit_vote', {
-      p_voter_id: currentVoterId,
-      p_fingerprint: fingerprint,
       p_winner_id: winnerId,
       p_loser_id: loserId,
     });
 
     if (error) {
       const msg = (error.message || '').toLowerCase();
+      if (msg.includes('not authenticated')) {
+        return { error: 'Session expired — refresh the page to vote again.' };
+      }
       if (msg.includes('duplicate') || msg.includes('already voted')) {
         return { error: 'You already voted on this matchup recently!' };
       }
@@ -163,48 +168,13 @@ export async function fetchAllHarmiesFromSupabase() {
   }
 }
 
-// Synchronizes core NFT records into Supabase via the upsert_harmie RPC
-// (which is SECURITY DEFINER, so anon can call it but cannot write to the
-// harmies table directly).
-export async function syncNFTsToSupabase(nfts) {
-  if (!supabase || !upsertRpcAvailable) return;
-
-  const concurrency = 4;
-  const queue = nfts.slice();
-  const runners = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
-    while (queue.length > 0) {
-      if (!upsertRpcAvailable) break;
-      const nft = queue.shift();
-      try {
-        const { error } = await supabase.rpc('upsert_harmie', {
-          p_id: nft.id,
-          p_name: nft.name || 'Unknown Harmie',
-          p_image_url: nft.image || null,
-          p_metadata: {
-            attributes: nft.attributes || {},
-            bgColor: nft.bgColor || null,
-            description: nft.description || '',
-          },
-        });
-        if (error) {
-          const msg = String(error.message || '').toLowerCase();
-          if (
-            msg.includes('could not find the function') ||
-            msg.includes('404') ||
-            msg.includes('not found')
-          ) {
-            upsertRpcAvailable = false;
-            devWarn('upsert_harmie RPC not found; disabling client sync to avoid request spam.');
-            break;
-          }
-        }
-      } catch {
-        /* per-row failure is fine */
-      }
-    }
-  });
-  await Promise.all(runners);
-  devLog(`Synced ${nfts.length} NFTs to Supabase`);
+/**
+ * Collection rows must be seeded with the Supabase service_role key
+ * (SQL editor, Edge Function, or CI script calling upsert_harmie).
+ * The browser cannot call upsert_harmie after the security migration.
+ */
+export async function syncNFTsToSupabase() {
+  return;
 }
 
 export function subscribeToEloUpdates(callback) {
@@ -221,5 +191,5 @@ export function subscribeToEloUpdates(callback) {
 }
 
 export function isSupabaseReady() {
-  return isInitialized && !!supabase;
+  return isInitialized && !!supabase && authSessionReady;
 }

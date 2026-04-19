@@ -1,7 +1,21 @@
 -- ============================================================
 -- HARMIE CHARM ARENA — Supabase Database Schema
 -- Run this in your Supabase SQL Editor (Dashboard → SQL Editor)
+--
+-- BEFORE GOING LIVE:
+-- 1) Auth → Providers → enable "Anonymous sign-ins" (voting uses auth.uid()).
+-- 2) Apply this file (or the migration block below) on existing projects.
+--
+-- SECURITY NOTES:
+-- - submit_vote uses auth.uid() only (no client-supplied voter id).
+-- - upsert_harmie is service_role only — seed from a script with the
+--   service key, never from the browser.
+-- - Matchup tokens / wallet signatures can be added later for stronger
+--   integrity than anonymous auth alone.
 -- ============================================================
+
+-- --- Upgrade path: drop legacy 4-arg vote RPC if present ---
+DROP FUNCTION IF EXISTS submit_vote(text, text, text, text);
 
 -- 1. Create the harmies table (NFT data + ELO scores)
 CREATE TABLE IF NOT EXISTS harmies (
@@ -48,12 +62,12 @@ CREATE INDEX IF NOT EXISTS idx_votes_loser ON votes(loser_id);
 CREATE INDEX IF NOT EXISTS idx_votes_pair ON votes(winner_id, loser_id, voter_id, created_at DESC);
 
 -- 5. Create the submit_vote RPC function
--- This handles everything server-side: anti-rigging, ELO calc, score update
+-- Voter identity = auth.uid() (requires Anonymous or signed-in Supabase Auth).
+-- Optional p_fingerprint is advisory only (not used for access control).
 CREATE OR REPLACE FUNCTION submit_vote(
-  p_voter_id TEXT,
-  p_fingerprint TEXT,
   p_winner_id TEXT,
-  p_loser_id TEXT
+  p_loser_id TEXT,
+  p_fingerprint TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -61,6 +75,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_voter_id TEXT;
   v_winner_elo INTEGER;
   v_loser_elo INTEGER;
   v_winner_matches INTEGER;
@@ -75,19 +90,20 @@ DECLARE
   v_session_record RECORD;
   v_votes_today INTEGER;
 BEGIN
+  v_voter_id := (SELECT auth.uid())::text;
+  IF v_voter_id IS NULL OR length(v_voter_id) < 10 THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
   -- 0. Sanity check: winner and loser must be different
   IF p_winner_id = p_loser_id THEN
     RAISE EXCEPTION 'Winner and loser cannot be the same NFT';
   END IF;
 
-  IF p_voter_id IS NULL OR length(p_voter_id) < 10 THEN
-    RAISE EXCEPTION 'Invalid voter id';
-  END IF;
-
   -- 1. Check for duplicate pair vote within 24 hours
   SELECT COUNT(*) INTO v_duplicate_count
   FROM votes
-  WHERE voter_id = p_voter_id
+  WHERE voter_id = v_voter_id
     AND (
       (winner_id = p_winner_id AND loser_id = p_loser_id) OR
       (winner_id = p_loser_id AND loser_id = p_winner_id)
@@ -99,7 +115,7 @@ BEGIN
   END IF;
 
   -- 2. Check daily vote limit
-  SELECT * INTO v_session_record FROM voter_sessions WHERE voter_id = p_voter_id;
+  SELECT * INTO v_session_record FROM voter_sessions WHERE voter_id = v_voter_id;
 
   IF v_session_record IS NOT NULL THEN
     -- Reset daily count if new day
@@ -161,11 +177,11 @@ BEGIN
 
   -- 6. Record the vote
   INSERT INTO votes (voter_id, fingerprint, winner_id, loser_id, winner_elo_change, loser_elo_change)
-  VALUES (p_voter_id, p_fingerprint, p_winner_id, p_loser_id, v_winner_change, v_loser_change);
+  VALUES (v_voter_id, p_fingerprint, p_winner_id, p_loser_id, v_winner_change, v_loser_change);
 
   -- 7. Update voter session
   INSERT INTO voter_sessions (voter_id, fingerprint, last_vote_at, total_votes, votes_today, last_vote_date)
-  VALUES (p_voter_id, p_fingerprint, NOW(), 1, 1, CURRENT_DATE)
+  VALUES (v_voter_id, p_fingerprint, NOW(), 1, 1, CURRENT_DATE)
   ON CONFLICT (voter_id) DO UPDATE SET
     last_vote_at = NOW(),
     total_votes = voter_sessions.total_votes + 1,
@@ -213,8 +229,9 @@ REVOKE INSERT, UPDATE, DELETE ON harmies FROM anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON votes FROM anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON voter_sessions FROM anon, authenticated;
 
--- 10. Allow only the controlled RPC for vote submission
-GRANT EXECUTE ON FUNCTION submit_vote(TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
+-- 10. Vote RPC: authenticated sessions only (includes Supabase Anonymous users).
+REVOKE ALL ON FUNCTION submit_vote(TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION submit_vote(TEXT, TEXT, TEXT) TO authenticated;
 
 -- 11. Service role still needs to seed the harmies table.
 --     The Netlify build (or one-time admin script) should call into a
@@ -241,7 +258,8 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION upsert_harmie(TEXT, TEXT, TEXT, JSONB) TO anon, authenticated;
+REVOKE ALL ON FUNCTION upsert_harmie(TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION upsert_harmie(TEXT, TEXT, TEXT, JSONB) TO service_role;
 
 -- 12. Enable realtime for the harmies table
 ALTER PUBLICATION supabase_realtime ADD TABLE harmies;

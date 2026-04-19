@@ -1,10 +1,11 @@
 // Netlify serverless function to proxy Magic Eden API requests.
 // Only forwards safe GET requests to allow-listed paths.
 
-const ALLOWED_ORIGINS = (Netlify.env.get('ALLOWED_ORIGINS') || '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+import {
+  collectAllowedOrigins,
+  originOrRefererAllowed,
+  rateLimitMagicEden,
+} from './proxy-utils.mjs';
 
 const ALLOWED_PATH_PATTERNS = [
   /^\/v2\/collections\/[a-z0-9_-]+\/listings$/i,
@@ -14,12 +15,18 @@ const ALLOWED_PATH_PATTERNS = [
 ];
 
 function corsHeaders(request) {
-  const origin = request.headers.get('origin') || '';
-  const allow = ALLOWED_ORIGINS.length === 0
-    ? origin || '*'
-    : (ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]);
+  const origin = (request.headers.get('origin') || '').trim().replace(/\/+$/, '');
+  const allowed = collectAllowedOrigins();
+  let allowOrigin = '';
+  if (allowed.length === 0) {
+    allowOrigin = origin || '*';
+  } else if (origin && allowed.includes(origin)) {
+    allowOrigin = origin;
+  } else {
+    allowOrigin = allowed[0] || '*';
+  }
   return {
-    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Origin': allowOrigin,
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -33,6 +40,9 @@ export default async (request) => {
   };
 
   if (request.method === 'OPTIONS') {
+    if (!originOrRefererAllowed(request)) {
+      return new Response(null, { status: 403 });
+    }
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
 
@@ -40,6 +50,16 @@ export default async (request) => {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: baseHeaders,
+    });
+  }
+
+  const limited = rateLimitMagicEden(request);
+  if (limited) return limited;
+
+  if (!originOrRefererAllowed(request)) {
+    return new Response(JSON.stringify({ error: 'Forbidden origin' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 

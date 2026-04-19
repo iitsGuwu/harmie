@@ -5,6 +5,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Optional: extra allowed browser origins for API proxies (comma-separated).
+  # Netlify sets URL and DEPLOY_PRIME_URL automatically for primary / preview domains.
 
 # SPA redirect
 [[redirects]]

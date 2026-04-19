@@ -12,7 +12,6 @@ import {
   initSupabase,
   fetchEloScores,
   fetchAllHarmiesFromSupabase,
-  syncNFTsToSupabase,
   subscribeToEloUpdates,
 } from './services/supabaseService.js';
 import { renderGallery, updateGalleryData } from './pages/gallery.js';
@@ -125,6 +124,8 @@ async function initApp() {
       });
     }
 
+    await supabaseInitPromise;
+
     if (allNFTs.length === 0) {
       updateLoading('Could not load NFTs. Please refresh later.', 0);
       return;
@@ -196,7 +197,6 @@ async function hydrateSecondaryData(supabaseInitPromise, hadCache) {
         .then((eloData) => {
           mergeEloData(allNFTs, eloData);
           setupRealtimeSubscriptions();
-          syncNFTsToSupabase(allNFTs).catch(devWarn);
         })
         .catch(devWarn)
     : Promise.resolve();

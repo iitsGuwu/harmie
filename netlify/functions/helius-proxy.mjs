@@ -1,18 +1,27 @@
-// Netlify serverless function to proxy Helius API requests in production.
-// API key comes from Netlify environment variables (set in dashboard).
+// Netlify serverless function to proxy Helius DAS requests in production.
+// API key stays server-side. JSON-RPC methods are allow-listed; origins gated.
 
-const ALLOWED_ORIGINS = (Netlify.env.get('ALLOWED_ORIGINS') || '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+import {
+  collectAllowedOrigins,
+  originOrRefererAllowed,
+  rateLimitHelius,
+} from './proxy-utils.mjs';
+
+const HELIUS_ALLOWED_METHODS = new Set(['getAssetsByGroup', 'searchAssets']);
 
 function corsHeaders(request) {
-  const origin = request.headers.get('origin') || '';
-  const allow = ALLOWED_ORIGINS.length === 0
-    ? origin || '*'
-    : (ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]);
+  const origin = (request.headers.get('origin') || '').trim().replace(/\/+$/, '');
+  const allowed = collectAllowedOrigins();
+  let allowOrigin = '';
+  if (allowed.length === 0) {
+    allowOrigin = origin || '*';
+  } else if (origin && allowed.includes(origin)) {
+    allowOrigin = origin;
+  } else {
+    allowOrigin = allowed[0] || '*';
+  }
   return {
-    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Origin': allowOrigin,
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -26,6 +35,9 @@ export default async (request) => {
   };
 
   if (request.method === 'OPTIONS') {
+    if (!originOrRefererAllowed(request)) {
+      return new Response(null, { status: 403 });
+    }
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
 
@@ -36,11 +48,18 @@ export default async (request) => {
     });
   }
 
+  const limited = rateLimitHelius(request);
+  if (limited) return limited;
+
+  if (!originOrRefererAllowed(request)) {
+    return new Response(JSON.stringify({ error: 'Forbidden origin' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const HELIUS_API_KEY = Netlify.env.get('HELIUS_API_KEY') || '';
   if (!HELIUS_API_KEY) {
-    // Graceful fallback for misconfigured environments:
-    // return an empty JSON-RPC result so the client can continue
-    // with Magic Eden fallback without noisy 500 errors.
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: 'helius-unconfigured', result: { items: [] } }), {
       status: 200,
       headers: baseHeaders,
@@ -60,6 +79,24 @@ export default async (request) => {
   if (body && body.length > 64 * 1024) {
     return new Response(JSON.stringify({ error: 'Payload too large' }), {
       status: 413,
+      headers: baseHeaders,
+    });
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400,
+      headers: baseHeaders,
+    });
+  }
+
+  const method = parsed?.method;
+  if (typeof method !== 'string' || !HELIUS_ALLOWED_METHODS.has(method)) {
+    return new Response(JSON.stringify({ error: 'RPC method not allowed' }), {
+      status: 403,
       headers: baseHeaders,
     });
   }
