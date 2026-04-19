@@ -6,6 +6,7 @@ import { fetchListings, fetchActivities, mergeMarketplaceData } from './services
 import {
   initSupabase,
   fetchEloScores,
+  fetchAllHarmiesFromSupabase,
   syncNFTsToSupabase,
   subscribeToEloUpdates,
 } from './services/supabaseService.js';
@@ -26,7 +27,7 @@ const THEME_KEY = 'harmies_theme_mode';
 const VALID_THEMES = new Set(['light', 'mid', 'dark']);
 const THEME_ORDER = ['light', 'mid', 'dark'];
 
-const NFT_CACHE_KEY = 'harmies_nft_cache_v1';
+const NFT_CACHE_KEY = 'harmies_nft_cache_v2';
 const NFT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache
 
 let realtimeChannel = null;
@@ -190,7 +191,18 @@ async function hydrateSecondaryData(supabaseInitPromise, hadCache) {
         .catch(devWarn)
     : Promise.resolve();
 
-  await Promise.allSettled([freshFetchPromise, marketplacePromise, eloPromise]);
+  const collectionPromise = supabaseReady
+    ? fetchAllHarmiesFromSupabase()
+        .then((rows) => {
+          if (rows.length > 0) {
+            allNFTs = mergeFreshNfts(allNFTs, rows);
+            recomputeRanks(allNFTs);
+          }
+        })
+        .catch(devWarn)
+    : Promise.resolve();
+
+  await Promise.allSettled([freshFetchPromise, marketplacePromise, eloPromise, collectionPromise]);
 
   writeCachedNFTs(allNFTs);
   pushDataToCurrentPage();

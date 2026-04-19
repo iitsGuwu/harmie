@@ -256,6 +256,10 @@ function renderMatchup() {
 async function handleVote(side) {
   if (isVoting) return;
   if (!currentPair[0] || !currentPair[1]) return;
+  if (!isSupabaseReady()) {
+    showToast('Voting service is still connecting. Please try again in a moment.', 'info');
+    return;
+  }
   isVoting = true;
 
   const winnerIdx = side === 'left' ? 0 : 1;
@@ -304,15 +308,13 @@ async function handleVote(side) {
   localStorage.setItem('harmies_matches', String(matchesPlayed));
   updateStatsDisplay();
 
-  if (isSupabaseReady()) {
-    try {
-      const result = await submitVote(winner.id, loser.id);
-      if (result?.error) {
-        rollback(winner, loser, snapshot, result.error);
-      }
-    } catch (err) {
-      rollback(winner, loser, snapshot, err?.message || 'Network error');
+  try {
+    const result = await submitVote(winner.id, loser.id);
+    if (result?.error) {
+      rollback(winner, loser, snapshot, result.error);
     }
+  } catch (err) {
+    rollback(winner, loser, snapshot, err?.message || 'Network error');
   }
 
   setTimeout(() => loadNewMatchup(), 1400);

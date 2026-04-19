@@ -9,6 +9,9 @@ let cacheTimestamp = 0;
 const HELIUS_MAX_PAGES = 10;
 const ME_TOKEN_DETAIL_LIMIT = 60;
 const ME_TOKEN_DETAIL_CONCURRENCY = 5;
+const MIN_EXPECTED_COLLECTION_SIZE = 450;
+const ME_COLLECTION_TOKEN_LIMIT = 100;
+const ME_COLLECTION_TOKEN_MAX_PAGES = 20;
 
 export async function fetchAllHarmies(onProgress) {
   if (cachedNFTs && Date.now() - cacheTimestamp < CONFIG.CACHE_TTL_MS) {
@@ -18,6 +21,14 @@ export async function fetchAllHarmies(onProgress) {
   if (onProgress) onProgress('Summoning the Harmies...', 10);
 
   let allNFTs = await fetchFromHelius(onProgress);
+
+  // If Helius is unavailable or partial in production, pull the
+  // full collection token index from Magic Eden as a reliable fallback.
+  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
+    if (onProgress) onProgress('Reconciling full collection index...', 25);
+    const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
+    allNFTs = mergeById(allNFTs, meCollection);
+  }
 
   if (allNFTs.length === 0) {
     if (onProgress) onProgress('Using Magic Eden data...', 20);
@@ -246,6 +257,71 @@ async function fetchFromMagicEden(onProgress) {
   return [...nftMap.values()];
 }
 
+async function fetchFromMagicEdenCollectionTokens(onProgress) {
+  const nftMap = new Map();
+  let offset = 0;
+  let page = 0;
+
+  while (page < ME_COLLECTION_TOKEN_MAX_PAGES) {
+    try {
+      const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/tokens?offset=${offset}&limit=${ME_COLLECTION_TOKEN_LIMIT}`;
+      const response = await fetch(url);
+      if (!response.ok) break;
+
+      const tokens = await response.json();
+      if (!Array.isArray(tokens) || tokens.length === 0) break;
+
+      for (const token of tokens) {
+        const mint =
+          token.mintAddress ||
+          token.tokenMint ||
+          token.id ||
+          token.address ||
+          token.mint;
+        if (!mint) continue;
+
+        const attrs = token.attributes || token.traits || [];
+        const parsedAttrs = parseAttributes(attrs);
+        nftMap.set(mint, {
+          id: mint,
+          name: token.name || token.title || `Harmies #${mint.slice(0, 6)}`,
+          image: token.image || token.img || token.imageUrl || '',
+          description: token.description || '',
+          attributes: parsedAttrs,
+          bgColor:
+            parsedAttrs.Background ||
+            parsedAttrs.background ||
+            (attrs.find?.((a) => a?.trait_type === 'Background')?.value ?? null),
+          owner: token.owner || null,
+          listPrice: null,
+          highestSale: null,
+          eloScore: CONFIG.ELO_DEFAULT,
+          rank: null,
+          totalMatches: 0,
+          wins: 0,
+          losses: 0,
+        });
+      }
+
+      if (onProgress) {
+        onProgress(
+          `Indexed ${nftMap.size} collection tokens...`,
+          Math.min(70, 25 + page * 2),
+        );
+      }
+
+      if (tokens.length < ME_COLLECTION_TOKEN_LIMIT) break;
+      offset += tokens.length;
+      page++;
+      await delay(150);
+    } catch {
+      break;
+    }
+  }
+
+  return [...nftMap.values()];
+}
+
 function generateFromKnownData() {
   const nfts = [];
   for (let i = 1; i <= 500; i++) {
@@ -340,4 +416,29 @@ async function runWithConcurrency(items, concurrency, worker) {
     }
   });
   await Promise.all(runners);
+}
+
+function mergeById(primary, secondary) {
+  const map = new Map((primary || []).map((nft) => [nft.id, nft]));
+  for (const nft of secondary || []) {
+    if (!nft?.id) continue;
+    const existing = map.get(nft.id);
+    if (!existing) {
+      map.set(nft.id, nft);
+      continue;
+    }
+    map.set(nft.id, {
+      ...existing,
+      name: existing.name || nft.name,
+      image: existing.image || nft.image,
+      description: existing.description || nft.description,
+      attributes:
+        existing.attributes && Object.keys(existing.attributes).length > 0
+          ? existing.attributes
+          : nft.attributes,
+      bgColor: existing.bgColor || nft.bgColor,
+      owner: existing.owner || nft.owner,
+    });
+  }
+  return [...map.values()];
 }

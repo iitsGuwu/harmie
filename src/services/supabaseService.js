@@ -122,6 +122,46 @@ export async function fetchEloScores() {
   }
 }
 
+export async function fetchAllHarmiesFromSupabase() {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('harmies')
+      .select('id, name, image_url, metadata, elo_score, total_matches, wins, losses')
+      .order('name', { ascending: true });
+
+    if (error) {
+      devWarn('Error fetching harmies collection:', error);
+      return [];
+    }
+
+    return (data || []).map((item) => {
+      const metadata = item.metadata || {};
+      const attrs = metadata.attributes || {};
+      return {
+        id: item.id,
+        name: item.name || 'Unknown Harmie',
+        image: item.image_url || '',
+        description: metadata.description || '',
+        attributes: attrs,
+        bgColor: metadata.bgColor || attrs.Background || attrs.background || null,
+        owner: null,
+        listPrice: null,
+        highestSale: null,
+        eloScore: item.elo_score || CONFIG.ELO_DEFAULT,
+        rank: null,
+        totalMatches: item.total_matches || 0,
+        wins: item.wins || 0,
+        losses: item.losses || 0,
+      };
+    });
+  } catch (err) {
+    devWarn('Collection fetch error:', err);
+    return [];
+  }
+}
+
 // Synchronizes core NFT records into Supabase via the upsert_harmie RPC
 // (which is SECURITY DEFINER, so anon can call it but cannot write to the
 // harmies table directly).

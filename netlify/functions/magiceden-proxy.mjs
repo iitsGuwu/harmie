@@ -9,6 +9,7 @@ const ALLOWED_ORIGINS = (Netlify.env.get('ALLOWED_ORIGINS') || '')
 const ALLOWED_PATH_PATTERNS = [
   /^\/v2\/collections\/[a-z0-9_-]+\/listings$/i,
   /^\/v2\/collections\/[a-z0-9_-]+\/activities$/i,
+  /^\/v2\/collections\/[a-z0-9_-]+\/tokens$/i,
   /^\/v2\/tokens\/[A-Za-z0-9]+$/,
 ];
 
