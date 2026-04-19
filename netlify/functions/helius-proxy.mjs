@@ -38,8 +38,11 @@ export default async (request) => {
 
   const HELIUS_API_KEY = Netlify.env.get('HELIUS_API_KEY') || '';
   if (!HELIUS_API_KEY) {
-    return new Response(JSON.stringify({ error: 'HELIUS_API_KEY not configured' }), {
-      status: 500,
+    // Graceful fallback for misconfigured environments:
+    // return an empty JSON-RPC result so the client can continue
+    // with Magic Eden fallback without noisy 500 errors.
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 'helius-unconfigured', result: { items: [] } }), {
+      status: 200,
       headers: baseHeaders,
     });
   }

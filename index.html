@@ -10,23 +10,12 @@
   <meta property="og:description" content="500 Harmies, 500 reasons to smile. Vote in the Battle Arena!" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
+  <script src="/theme-init.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/src/style.css" />
-  <script>
-    // Pre-paint theme to avoid flash of incorrect mode
-    (function () {
-      try {
-        var saved = localStorage.getItem('harmies_theme_mode');
-        var theme = (saved === 'light' || saved === 'mid' || saved === 'dark') ? saved : 'mid';
-        document.documentElement.setAttribute('data-theme', theme);
-      } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'mid');
-      }
-    })();
-  </script>
 </head>
 <body>
   <!-- Loading Screen -->

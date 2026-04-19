@@ -6,9 +6,6 @@ import { devWarn } from '../utils/dom.js';
 let cachedNFTs = null;
 let cacheTimestamp = 0;
 
-const HARMIES_IPFS_BASE =
-  'https://gray-patient-duck-402.mypinata.cloud/ipfs/bafybeify6cu2boe5vspdgggcnsybukqhgzxbydzukcxlx6fvpgyef3giky';
-
 const HELIUS_MAX_PAGES = 10;
 const ME_TOKEN_DETAIL_LIMIT = 60;
 const ME_TOKEN_DETAIL_CONCURRENCY = 5;
@@ -245,16 +242,6 @@ async function fetchFromMagicEden(onProgress) {
     });
   }
 
-  // Pattern-fill any still-missing images
-  for (const nft of nftMap.values()) {
-    if (!nft.image) {
-      const num = extractNumber(nft.name);
-      if (num !== null) {
-        nft.image = `${HARMIES_IPFS_BASE}/harmie_${num}.png`;
-      }
-    }
-  }
-
   if (onProgress) onProgress(`Loaded ${nftMap.size} Harmies from marketplace!`, 95);
   return [...nftMap.values()];
 }
@@ -265,7 +252,7 @@ function generateFromKnownData() {
     nfts.push({
       id: `harmie_placeholder_${i}`,
       name: `Harmies #${i}`,
-      image: `${HARMIES_IPFS_BASE}/harmie_${i}.png`,
+      image: '',
       description: '',
       attributes: {},
       bgColor: null,
