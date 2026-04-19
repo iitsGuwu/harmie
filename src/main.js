@@ -131,6 +131,9 @@ async function initApp() {
 
     updateLoading('LET\'S GO!', 100);
     isLoading = false;
+    // Re-render now that loading has completed; avoids spinner-only state
+    // until users navigate manually.
+    handleRoute();
 
     setTimeout(() => {
       if (loadingScreen) loadingScreen.classList.add('fade-out');

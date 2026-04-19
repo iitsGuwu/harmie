@@ -9,6 +9,7 @@ let currentVoterId = null;
 let fingerprint = null;
 let lastVoteTime = 0;
 let isInitialized = false;
+let upsertRpcAvailable = true;
 
 export async function initSupabase() {
   if (isInitialized) return true;
@@ -166,15 +167,16 @@ export async function fetchAllHarmiesFromSupabase() {
 // (which is SECURITY DEFINER, so anon can call it but cannot write to the
 // harmies table directly).
 export async function syncNFTsToSupabase(nfts) {
-  if (!supabase) return;
+  if (!supabase || !upsertRpcAvailable) return;
 
   const concurrency = 4;
   const queue = nfts.slice();
   const runners = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
     while (queue.length > 0) {
+      if (!upsertRpcAvailable) break;
       const nft = queue.shift();
       try {
-        await supabase.rpc('upsert_harmie', {
+        const { error } = await supabase.rpc('upsert_harmie', {
           p_id: nft.id,
           p_name: nft.name || 'Unknown Harmie',
           p_image_url: nft.image || null,
@@ -184,6 +186,18 @@ export async function syncNFTsToSupabase(nfts) {
             description: nft.description || '',
           },
         });
+        if (error) {
+          const msg = String(error.message || '').toLowerCase();
+          if (
+            msg.includes('could not find the function') ||
+            msg.includes('404') ||
+            msg.includes('not found')
+          ) {
+            upsertRpcAvailable = false;
+            devWarn('upsert_harmie RPC not found; disabling client sync to avoid request spam.');
+            break;
+          }
+        }
       } catch {
         /* per-row failure is fine */
       }

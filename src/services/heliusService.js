@@ -261,14 +261,26 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
   const nftMap = new Map();
   let offset = 0;
   let page = 0;
+  let cursor = null;
+  const seenCursors = new Set();
 
   while (page < ME_COLLECTION_TOKEN_MAX_PAGES) {
     try {
-      const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/tokens?offset=${offset}&limit=${ME_COLLECTION_TOKEN_LIMIT}`;
+      const qs = cursor
+        ? `continuation=${encodeURIComponent(cursor)}&limit=${ME_COLLECTION_TOKEN_LIMIT}`
+        : `offset=${offset}&limit=${ME_COLLECTION_TOKEN_LIMIT}`;
+      const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/tokens?${qs}`;
       const response = await fetch(url);
       if (!response.ok) break;
 
-      const tokens = await response.json();
+      const payload = await response.json();
+      const tokens = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload?.tokens)
+            ? payload.tokens
+            : [];
       if (!Array.isArray(tokens) || tokens.length === 0) break;
 
       for (const token of tokens) {
@@ -310,7 +322,20 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         );
       }
 
-      if (tokens.length < ME_COLLECTION_TOKEN_LIMIT) break;
+      const nextCursor =
+        payload?.continuation ||
+        payload?.next ||
+        payload?.nextCursor ||
+        payload?.cursor ||
+        null;
+      if (nextCursor && !seenCursors.has(nextCursor)) {
+        seenCursors.add(nextCursor);
+        cursor = nextCursor;
+      } else {
+        cursor = null;
+      }
+
+      if (!cursor && tokens.length < ME_COLLECTION_TOKEN_LIMIT) break;
       offset += tokens.length;
       page++;
       await delay(150);
