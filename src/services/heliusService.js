@@ -6,15 +6,20 @@ import { devWarn } from '../utils/dom.js';
 let cachedNFTs = null;
 let cacheTimestamp = 0;
 
-const HELIUS_MAX_PAGES = 10;
-const ME_TOKEN_DETAIL_LIMIT = 60;
-const ME_TOKEN_DETAIL_CONCURRENCY = 5;
-const MIN_EXPECTED_COLLECTION_SIZE = 450;
+const HELIUS_MAX_PAGES = 30;
+const ME_TOKEN_DETAIL_LIMIT = 600;
+const ME_TOKEN_DETAIL_CONCURRENCY = 8;
+/** Below this count, snapshots are treated as incomplete (refetch, no short-circuit cache). */
+export const MIN_EXPECTED_COLLECTION_SIZE = 450;
 const ME_COLLECTION_TOKEN_LIMIT = 100;
-const ME_COLLECTION_TOKEN_MAX_PAGES = 20;
+const ME_COLLECTION_TOKEN_MAX_PAGES = 60;
 
 export async function fetchAllHarmies(onProgress) {
-  if (cachedNFTs && Date.now() - cacheTimestamp < CONFIG.CACHE_TTL_MS) {
+  if (
+    cachedNFTs &&
+    Date.now() - cacheTimestamp < CONFIG.CACHE_TTL_MS &&
+    cachedNFTs.length >= MIN_EXPECTED_COLLECTION_SIZE
+  ) {
     return cachedNFTs;
   }
 
@@ -29,6 +34,14 @@ export async function fetchAllHarmies(onProgress) {
     const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
     allNFTs = mergeById(allNFTs, meCollection);
   }
+
+  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
+    if (onProgress) onProgress('Trying alternate index...', 28);
+    const search = await fetchFromHeliusSearchAssets(onProgress);
+    allNFTs = mergeById(allNFTs, search);
+  }
+
+  await enrichMissingFromMagicEden(allNFTs, onProgress);
 
   if (allNFTs.length === 0) {
     if (onProgress) onProgress('Using Magic Eden data...', 20);
@@ -55,16 +68,21 @@ export async function fetchAllHarmies(onProgress) {
 }
 
 export function primeNFTCache(nfts) {
-  if (Array.isArray(nfts) && nfts.length > 0) {
+  if (
+    Array.isArray(nfts) &&
+    nfts.length > 0 &&
+    nfts.length >= MIN_EXPECTED_COLLECTION_SIZE
+  ) {
     cachedNFTs = nfts;
     cacheTimestamp = Date.now();
   }
 }
 
 async function fetchFromHelius(onProgress) {
-  const allNFTs = [];
+  const byId = new Map();
   let page = 1;
   const limit = 1000;
+  let reportedTotal = Number.POSITIVE_INFINITY;
 
   while (page <= HELIUS_MAX_PAGES) {
     let response;
@@ -81,42 +99,152 @@ async function fetchFromHelius(onProgress) {
             groupValue: CONFIG.COLLECTION_MINT,
             page,
             limit,
+            sortBy: { sortBy: 'created', sortDirection: 'asc' },
+            options: { showGrandTotal: true },
           },
         }),
       });
     } catch (err) {
       devWarn('Helius fetch error:', err.message);
-      return allNFTs;
+      return [...byId.values()];
     }
 
-    if (!response.ok) return allNFTs;
+    if (!response.ok) return [...byId.values()];
 
     let data;
     try {
       data = await response.json();
     } catch {
-      return allNFTs;
+      return [...byId.values()];
     }
     if (data.error) {
       devWarn('Helius error:', data.error.message);
-      return allNFTs;
+      return [...byId.values()];
     }
 
-    const items = data.result?.items || [];
+    const result = data.result || {};
+    if (typeof result.total === 'number' && Number.isFinite(result.total)) {
+      reportedTotal = result.total;
+    }
+
+    const items = result.items || [];
+    if (items.length === 0) break;
+
+    const sizeBefore = byId.size;
     for (const item of items) {
       const nft = parseHeliusAsset(item);
-      if (nft) allNFTs.push(nft);
+      if (nft) byId.set(nft.id, nft);
     }
+    if (byId.size === sizeBefore) break;
 
     if (onProgress) {
-      onProgress(`Found ${allNFTs.length} Harmies via RPC...`, Math.min(90, 20 + allNFTs.length / 5));
+      onProgress(
+        `Found ${byId.size} Harmies via RPC...`,
+        Math.min(90, 20 + byId.size / 5),
+      );
     }
 
-    if (items.length < limit) break;
-    page++;
+    if (byId.size >= reportedTotal) break;
+
+    if (items.length >= limit) {
+      page++;
+      continue;
+    }
+
+    if (reportedTotal !== Number.POSITIVE_INFINITY && byId.size < reportedTotal) {
+      page++;
+      continue;
+    }
+
+    break;
   }
 
-  return allNFTs;
+  return [...byId.values()];
+}
+
+/** Fallback indexer path when getAssetsByGroup returns a short page before the full set. */
+async function fetchFromHeliusSearchAssets(onProgress) {
+  const byId = new Map();
+  let page = 1;
+  const limit = 1000;
+  let reportedTotal = Number.POSITIVE_INFINITY;
+
+  while (page <= HELIUS_MAX_PAGES) {
+    let response;
+    try {
+      response = await fetch(CONFIG.HELIUS_RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `harmies-search-${page}`,
+          method: 'searchAssets',
+          params: {
+            grouping: ['collection', CONFIG.COLLECTION_MINT],
+            tokenType: 'all',
+            page,
+            limit,
+            sortBy: { sortBy: 'id', sortDirection: 'asc' },
+            options: { showUnverifiedCollections: true, showGrandTotal: true },
+          },
+        }),
+      });
+    } catch (err) {
+      devWarn('Helius searchAssets error:', err.message);
+      return [...byId.values()];
+    }
+
+    if (!response.ok) return [...byId.values()];
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return [...byId.values()];
+    }
+    if (data.error) {
+      devWarn('Helius searchAssets RPC error:', data.error.message);
+      return [...byId.values()];
+    }
+
+    const result = data.result || {};
+    if (typeof result.total === 'number' && Number.isFinite(result.total)) {
+      reportedTotal = result.total;
+    }
+
+    const items = result.items || [];
+    if (items.length === 0) break;
+
+    const sizeBefore = byId.size;
+    for (const item of items) {
+      const nft = parseHeliusAsset(item);
+      if (nft) byId.set(nft.id, nft);
+    }
+    if (byId.size === sizeBefore) break;
+
+    if (onProgress) {
+      onProgress(
+        `Indexed ${byId.size} Harmies (search)...`,
+        Math.min(88, 22 + byId.size / 6),
+      );
+    }
+
+    if (byId.size >= reportedTotal) break;
+
+    if (items.length >= limit) {
+      page++;
+      continue;
+    }
+
+    if (reportedTotal !== Number.POSITIVE_INFINITY && byId.size < reportedTotal) {
+      page++;
+      continue;
+    }
+
+    break;
+  }
+
+  return [...byId.values()];
 }
 
 async function fetchFromMagicEden(onProgress) {
@@ -276,15 +404,23 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
       const payload = await response.json();
       const tokens = Array.isArray(payload)
         ? payload
-        : Array.isArray(payload?.results)
-          ? payload.results
-          : Array.isArray(payload?.tokens)
-            ? payload.tokens
-            : [];
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : Array.isArray(payload?.tokens)
+              ? payload.tokens
+              : [];
       if (!Array.isArray(tokens) || tokens.length === 0) break;
 
       for (const token of tokens) {
+        const t = token.token || token;
         const mint =
+          t.mintAddress ||
+          t.tokenMint ||
+          t.id ||
+          t.address ||
+          t.mint ||
           token.mintAddress ||
           token.tokenMint ||
           token.id ||
@@ -292,19 +428,19 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
           token.mint;
         if (!mint) continue;
 
-        const attrs = token.attributes || token.traits || [];
+        const attrs = t.attributes || t.traits || token.attributes || token.traits || [];
         const parsedAttrs = parseAttributes(attrs);
         nftMap.set(mint, {
           id: mint,
-          name: token.name || token.title || `Harmies #${mint.slice(0, 6)}`,
-          image: token.image || token.img || token.imageUrl || '',
-          description: token.description || '',
+          name: t.name || t.title || token.name || token.title || `Harmies #${mint.slice(0, 6)}`,
+          image: t.image || t.img || t.imageUrl || token.image || token.img || token.imageUrl || '',
+          description: t.description || token.description || '',
           attributes: parsedAttrs,
           bgColor:
             parsedAttrs.Background ||
             parsedAttrs.background ||
             (attrs.find?.((a) => a?.trait_type === 'Background')?.value ?? null),
-          owner: token.owner || null,
+          owner: t.owner || token.owner || null,
           listPrice: null,
           highestSale: null,
           eloScore: CONFIG.ELO_DEFAULT,
@@ -322,6 +458,13 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         );
       }
 
+      const meTotal =
+        typeof payload?.total === 'number'
+          ? payload.total
+          : typeof payload?.tokenCount === 'number'
+            ? payload.tokenCount
+            : null;
+
       const nextCursor =
         payload?.continuation ||
         payload?.next ||
@@ -335,7 +478,13 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         cursor = null;
       }
 
-      if (!cursor && tokens.length < ME_COLLECTION_TOKEN_LIMIT) break;
+      if (
+        !cursor &&
+        tokens.length < ME_COLLECTION_TOKEN_LIMIT &&
+        (meTotal == null || nftMap.size >= meTotal)
+      ) {
+        break;
+      }
       offset += tokens.length;
       page++;
       await delay(150);
@@ -388,18 +537,22 @@ function parseHeliusAsset(item) {
     const files = content.files || [];
     const links = content.links || {};
 
-    let imageUrl = links.image || '';
+    let imageUrl =
+      links.image ||
+      links.thumbnail ||
+      metadata.image ||
+      '';
     if (!imageUrl && files.length > 0) {
-      imageUrl = files[0].cdn_uri || files[0].uri || '';
+      const primary = files.find((f) => f?.mime?.startsWith?.('image/')) || files[0];
+      imageUrl = primary?.cdn_uri || primary?.uri || '';
     }
-
     const attributes = metadata.attributes || [];
     const attributeMap = parseAttributes(attributes);
     const bgColor = attributeMap['Background'] || attributeMap['background'] || null;
 
     return {
       id,
-      name: metadata.name || `Harmie #${id.slice(0, 6)}`,
+      name: metadata.name || `Harmies #${id.slice(0, 6)}`,
       image: imageUrl,
       description: metadata.description || '',
       attributes: attributeMap,
@@ -443,6 +596,79 @@ async function runWithConcurrency(items, concurrency, worker) {
   await Promise.all(runners);
 }
 
+function hasCanonicalEditionName(name) {
+  if (!name || typeof name !== 'string') return false;
+  return /Harmies?\s*#\s*\d{1,5}\s*$/i.test(name.trim());
+}
+
+function needsMagicEdenEnrichment(nft) {
+  if (!nft?.id || String(nft.id).startsWith('harmie_placeholder')) return false;
+  if (!String(nft.image || '').trim()) return true;
+  const name = String(nft.name || '');
+  if (!name) return true;
+  if (hasCanonicalEditionName(name)) return false;
+  const m = name.match(/#\s*([A-Za-z0-9]+)\s*$/);
+  if (!m) return false;
+  const label = m[1];
+  if (/^\d+$/.test(label)) return false;
+  return label.length <= 12 && /[A-Za-z]/.test(label);
+}
+
+async function enrichMissingFromMagicEden(nfts, onProgress) {
+  const maxRounds = 4;
+  for (let round = 0; round < maxRounds; round++) {
+    const targets = nfts.filter(needsMagicEdenEnrichment);
+    if (targets.length === 0) return;
+
+    const cap = Math.min(targets.length, ME_TOKEN_DETAIL_LIMIT);
+    const slice = targets.slice(0, cap);
+    let done = 0;
+
+    await runWithConcurrency(slice, ME_TOKEN_DETAIL_CONCURRENCY, async (nft) => {
+    try {
+      const url = `${CONFIG.ME_API_BASE}/tokens/${nft.id}`;
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const token = await response.json();
+      const name = token.name || token.title;
+      const image =
+        token.image ||
+        token.img ||
+        token.imageUrl ||
+        token.imageUri ||
+        token.extra?.img ||
+        '';
+      if (name && (!nft.name || !hasCanonicalEditionName(nft.name))) {
+        nft.name = name;
+      }
+      if (image && !String(nft.image || '').trim()) {
+        nft.image = image;
+      }
+      const rawAttrs = token.attributes || token.traits || [];
+      if (
+        (!nft.attributes || Object.keys(nft.attributes).length === 0) &&
+        Array.isArray(rawAttrs) &&
+        rawAttrs.length > 0
+      ) {
+        nft.attributes = parseAttributes(rawAttrs);
+        nft.bgColor =
+          nft.attributes.Background ||
+          nft.attributes.background ||
+          rawAttrs.find?.((a) => a?.trait_type === 'Background')?.value ||
+          null;
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      done++;
+      if (onProgress && done % 25 === 0) {
+        onProgress(`Polishing metadata... ${done}/${cap}`, 96);
+      }
+    }
+  });
+  }
+}
+
 function mergeById(primary, secondary) {
   const map = new Map((primary || []).map((nft) => [nft.id, nft]));
   for (const nft of secondary || []) {
@@ -452,18 +678,41 @@ function mergeById(primary, secondary) {
       map.set(nft.id, nft);
       continue;
     }
-    map.set(nft.id, {
-      ...existing,
-      name: existing.name || nft.name,
-      image: existing.image || nft.image,
-      description: existing.description || nft.description,
-      attributes:
-        existing.attributes && Object.keys(existing.attributes).length > 0
-          ? existing.attributes
-          : nft.attributes,
-      bgColor: existing.bgColor || nft.bgColor,
-      owner: existing.owner || nft.owner,
-    });
+    map.set(nft.id, mergeTwoNftRecords(existing, nft));
   }
   return [...map.values()];
+}
+
+export function mergeTwoNftRecords(a, b) {
+  const pickName = () => {
+    const qa = hasCanonicalEditionName(a.name);
+    const qb = hasCanonicalEditionName(b.name);
+    if (qa && !qb) return a.name;
+    if (qb && !qa) return b.name;
+    if ((a.name || '').length >= (b.name || '').length) return a.name || b.name;
+    return b.name || a.name;
+  };
+
+  const pickImage = () => {
+    const ia = String(a.image || '').trim();
+    const ib = String(b.image || '').trim();
+    if (ib.length > ia.length) return b.image;
+    if (ia.length > ib.length) return a.image;
+    return ia ? a.image : b.image;
+  };
+
+  const attrA = a.attributes && Object.keys(a.attributes).length;
+  const attrB = b.attributes && Object.keys(b.attributes).length;
+  const attributes =
+    attrA >= attrB && attrA > 0 ? a.attributes : attrB > 0 ? b.attributes : a.attributes || b.attributes || {};
+
+  return {
+    ...a,
+    name: pickName(),
+    image: pickImage(),
+    description: (a.description || '').length >= (b.description || '').length ? a.description : b.description,
+    attributes,
+    bgColor: a.bgColor || b.bgColor,
+    owner: a.owner || b.owner,
+  };
 }

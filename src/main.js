@@ -1,7 +1,12 @@
 // Harmie Charm Arena — Main Application Entry
 import './style.css';
 import { CONFIG } from './config.js';
-import { fetchAllHarmies, primeNFTCache } from './services/heliusService.js';
+import {
+  fetchAllHarmies,
+  primeNFTCache,
+  MIN_EXPECTED_COLLECTION_SIZE,
+  mergeTwoNftRecords,
+} from './services/heliusService.js';
 import { fetchListings, fetchActivities, mergeMarketplaceData } from './services/magicEdenService.js';
 import {
   initSupabase,
@@ -27,7 +32,7 @@ const THEME_KEY = 'harmies_theme_mode';
 const VALID_THEMES = new Set(['light', 'mid', 'dark']);
 const THEME_ORDER = ['light', 'mid', 'dark'];
 
-const NFT_CACHE_KEY = 'harmies_nft_cache_v2';
+const NFT_CACHE_KEY = 'harmies_nft_cache_v3';
 const NFT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache
 
 let realtimeChannel = null;
@@ -109,7 +114,9 @@ async function initApp() {
     const cached = readCachedNFTs();
     if (cached && cached.length > 0) {
       allNFTs = cached;
-      primeNFTCache(cached);
+      if (cached.length >= MIN_EXPECTED_COLLECTION_SIZE) {
+        primeNFTCache(cached);
+      }
       updateLoading('Loading from cache...', 60);
     } else {
       updateLoading('Summoning the Harmies...', 20);
@@ -218,13 +225,13 @@ function mergeFreshNfts(existing, fresh) {
     if (!nft || !nft.id) continue;
     const prev = map.get(nft.id);
     if (prev) {
-      Object.assign(prev, {
-        name: nft.name || prev.name,
-        image: nft.image || prev.image,
-        attributes: nft.attributes || prev.attributes,
-        bgColor: nft.bgColor || prev.bgColor,
-        owner: nft.owner || prev.owner,
-      });
+      const merged = mergeTwoNftRecords(prev, nft);
+      merged.eloScore = nft.eloScore ?? merged.eloScore;
+      merged.totalMatches = nft.totalMatches ?? merged.totalMatches;
+      merged.wins = nft.wins ?? merged.wins;
+      merged.losses = nft.losses ?? merged.losses;
+      merged.rank = nft.rank ?? merged.rank;
+      Object.assign(prev, merged);
     } else {
       map.set(nft.id, nft);
     }
@@ -241,9 +248,10 @@ function readCachedNFTs() {
     const raw = localStorage.getItem(NFT_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.nfts)) return null;
-    if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
-    return parsed.nfts;
+  if (!parsed || !Array.isArray(parsed.nfts)) return null;
+  if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
+  if (parsed.nfts.length < MIN_EXPECTED_COLLECTION_SIZE) return null;
+  return parsed.nfts;
   } catch {
     return null;
   }
