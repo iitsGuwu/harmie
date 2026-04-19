@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harmie Arena — Community Voting & Gallery</title>
+  <meta name="description" content="Vote for your favorite Harmies in head-to-head charm battles. Browse, sort, and rank all 500 unique Harmies from the Solana collection." />
+  <meta name="theme-color" content="#5b58e8" />
+  <meta property="og:title" content="Harmie Arena — Community Voting & Gallery" />
+  <meta property="og:description" content="500 Harmies, 500 reasons to smile. Vote in the Battle Arena!" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/src/style.css" />
+  <script>
+    // Pre-paint theme to avoid flash of incorrect mode
+    (function () {
+      try {
+        var saved = localStorage.getItem('harmies_theme_mode');
+        var theme = (saved === 'light' || saved === 'mid' || saved === 'dark') ? saved : 'mid';
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'mid');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="loading-screen" role="status" aria-live="polite">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <span class="logo-text">HARMIE</span>
+        <span class="logo-sub">ARENA</span>
+      </div>
+      <div class="loading-bar-container">
+        <div class="loading-bar" id="loading-bar"></div>
+      </div>
+      <p class="loading-text" id="loading-text">Summoning the Harmies...</p>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="app hidden">
+    <!-- Navigation -->
+    <nav id="navbar" class="navbar" aria-label="Primary">
+      <div class="nav-inner">
+        <a href="#arena" class="nav-logo" id="nav-logo" aria-label="Harmie Arena home">
+          <span class="logo-badge">HARMIE</span>
+          <span class="logo-divider" aria-hidden="true">/</span>
+          <span class="logo-badge logo-badge-alt">ARENA</span>
+        </a>
+        <div class="nav-links">
+          <a href="#gallery" class="nav-link" data-page="gallery" id="nav-gallery">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M5 4h6a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M19 4h-6a3 3 0 0 0-3 3v13h6a3 3 0 0 1 3 3V4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            Gallery
+          </a>
+          <a href="#arena" class="nav-link active" data-page="arena" id="nav-arena">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="m7 5 5 5m0 0 5-5m-5 5 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M7 5v14m10-14v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            Battle
+          </a>
+          <a href="#leaderboard" class="nav-link" data-page="leaderboard" id="nav-leaderboard">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 4h10v4a5 5 0 0 1-10 0V4Z" stroke="currentColor" stroke-width="2"/>
+                <path d="M9 16h6m-7 4h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M17 6h2a2 2 0 0 1-2 2m-10-2H5a2 2 0 0 0 2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            Rankings
+          </a>
+        </div>
+        <div class="nav-external">
+          <a href="https://www.tensor.trade/trade/c7d45db9-0726-459c-bc42-afc8ee32e10a" target="_blank" rel="noopener noreferrer" class="nav-ext-link" id="nav-tensor" title="Trade on Tensor">
+            <span>Tensor</span>
+          </a>
+          <a href="https://magiceden.io/marketplace/harmies" target="_blank" rel="noopener noreferrer" class="nav-ext-link" id="nav-magiceden" title="Trade on Magic Eden">
+            <span>Magic Eden</span>
+          </a>
+          <a id="nav-github" target="_blank" rel="noopener noreferrer" class="nav-ext-link nav-github" title="View Source on GitHub" aria-label="View source on GitHub">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          </a>
+        </div>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mobile-menu">
+          <span></span><span></span><span></span>
+        </button>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Switch theme mode (light, mid, dark)" title="Switch theme mode">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+          <span class="theme-toggle-label" id="theme-toggle-label">MID</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="mobile-menu hidden" aria-label="Mobile navigation">
+      <a href="#gallery" class="mobile-link" data-page="gallery">Gallery</a>
+      <a href="#arena" class="mobile-link" data-page="arena">Battle Arena</a>
+      <a href="#leaderboard" class="mobile-link" data-page="leaderboard">Rankings</a>
+      <hr />
+      <a href="https://www.tensor.trade/trade/c7d45db9-0726-459c-bc42-afc8ee32e10a" target="_blank" rel="noopener noreferrer" class="mobile-link">Tensor</a>
+      <a href="https://magiceden.io/marketplace/harmies" target="_blank" rel="noopener noreferrer" class="mobile-link">Magic Eden</a>
+      <a id="mobile-github" target="_blank" rel="noopener noreferrer" class="mobile-link">GitHub</a>
+    </div>
+
+    <!-- Page Container -->
+    <main id="page-container" class="page-container">
+      <!-- Pages rendered dynamically -->
+    </main>
+
+    <!-- NFT Detail Modal -->
+    <div id="nft-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+      <div class="modal-content comic-panel">
+        <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Comic Effect Overlay -->
+    <div id="comic-effect" class="comic-effect hidden" aria-hidden="true"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <p>Community-built for Harmies holders</p>
+        <p class="footer-note">
+          Not affiliated with <a href="https://www.neuko.ai/" target="_blank" rel="noopener noreferrer"><u>Neuko</u></a> or the <a href="https://www.harmonyrx.net/" target="_blank" rel="noopener noreferrer"><u>Harmony</u></a> project.
+        </p>
+        <p class="footer-note">
+          Built by <a href="https://x.com/iitsGuru" target="_blank" rel="noopener noreferrer"><u>iitsGuru</u></a>.<span id="footer-github-line"> Opensourced on <a id="footer-github" target="_blank" rel="noopener noreferrer"><u>Github</u></a>.</span>
+        </p>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

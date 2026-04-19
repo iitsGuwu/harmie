@@ -1,0 +1,404 @@
+// Battle Arena — Head-to-head voting system with ELO
+import { CONFIG } from '../config.js';
+import { submitVote, isSupabaseReady } from '../services/supabaseService.js';
+import { showNFTModal } from '../components/modal.js';
+import { escapeHtml, attachImageFallback, FALLBACK_IMAGE } from '../utils/dom.js';
+import { showToast } from '../utils/toast.js';
+
+let allNFTs = [];
+let currentPair = [null, null];
+let matchesPlayed = 0;
+let isVoting = false;
+let streakCount = 0;
+
+const sessionVotedPairs = new Set();
+const MAX_PAIR_ATTEMPTS = 25;
+
+let keyHandler = null;
+
+export function renderArena(container, nfts) {
+  allNFTs = nfts.filter((n) => n.image);
+  matchesPlayed = parseInt(localStorage.getItem('harmies_matches') || '0', 10) || 0;
+
+  container.innerHTML = `
+    <div class="arena-page">
+      <div class="arena-header">
+        <h1 class="section-title">BATTLE ARENA</h1>
+        <p class="section-subtitle">Pick your favorite or the most charming! Your vote shapes the community rankings.</p>
+      </div>
+
+      <div class="arena-matchup" id="arena-matchup">
+        <div class="arena-fighter left" id="fighter-left" role="button" tabindex="0" aria-label="Vote for left Harmie">
+          <div class="fighter-panel">
+            <div class="fighter-image-wrapper">
+              <img class="fighter-image" id="fighter-left-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
+            </div>
+            <div class="fighter-info">
+              <div class="fighter-name" id="fighter-left-name">Loading...</div>
+              <div class="fighter-stats">
+                <div class="fighter-stat">
+                  <span>ELO:</span>
+                  <span class="fighter-elo" id="fighter-left-elo">—</span>
+                </div>
+                <div class="fighter-stat">
+                  <span>W/L:</span>
+                  <span class="fighter-stat-value" id="fighter-left-wl">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="vs-badge" aria-hidden="true">
+          <div class="vs-burst"></div>
+          <span class="vs-text">VS</span>
+        </div>
+
+        <div class="arena-fighter right" id="fighter-right" role="button" tabindex="0" aria-label="Vote for right Harmie">
+          <div class="fighter-panel">
+            <div class="fighter-image-wrapper">
+              <img class="fighter-image" id="fighter-right-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
+            </div>
+            <div class="fighter-info">
+              <div class="fighter-name" id="fighter-right-name">Loading...</div>
+              <div class="fighter-stats">
+                <div class="fighter-stat">
+                  <span>ELO:</span>
+                  <span class="fighter-elo" id="fighter-right-elo">—</span>
+                </div>
+                <div class="fighter-stat">
+                  <span>W/L:</span>
+                  <span class="fighter-stat-value" id="fighter-right-wl">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arena-actions">
+        <button class="arena-btn arena-btn-skip" id="arena-skip" type="button">SKIP →</button>
+      </div>
+
+      <div class="arena-stats-bar">
+        <div class="arena-stat">
+          <div class="arena-stat-value" id="stat-matches">${escapeHtml(matchesPlayed)}</div>
+          <div class="arena-stat-label">Your Battles</div>
+        </div>
+        <div class="arena-stat">
+          <div class="arena-stat-value" id="stat-streak">${escapeHtml(streakCount)}</div>
+          <div class="arena-stat-label">Streak</div>
+        </div>
+        <div class="arena-stat">
+          <div class="arena-stat-value" id="stat-total-nfts">${escapeHtml(allNFTs.length)}</div>
+          <div class="arena-stat-label">Harmies</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('img[data-fallback]').forEach(attachImageFallback);
+
+  loadNewMatchup();
+  bindArenaEvents();
+}
+
+function bindArenaEvents() {
+  const leftFighter = document.getElementById('fighter-left');
+  const rightFighter = document.getElementById('fighter-right');
+  const skipBtn = document.getElementById('arena-skip');
+
+  if (leftFighter) {
+    leftFighter.addEventListener('click', (e) => {
+      if (e.target.closest('.fighter-info')) {
+        showNFTModal(currentPair[0]);
+        return;
+      }
+      handleVote('left');
+    });
+    leftFighter.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleVote('left');
+      }
+    });
+  }
+
+  if (rightFighter) {
+    rightFighter.addEventListener('click', (e) => {
+      if (e.target.closest('.fighter-info')) {
+        showNFTModal(currentPair[1]);
+        return;
+      }
+      handleVote('right');
+    });
+    rightFighter.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleVote('right');
+      }
+    });
+  }
+
+  if (skipBtn) {
+    skipBtn.addEventListener('click', () => {
+      if (!isVoting) loadNewMatchup();
+    });
+  }
+
+  // Global keyboard shortcuts (only while arena is on screen)
+  if (keyHandler) {
+    document.removeEventListener('keydown', keyHandler);
+  }
+  keyHandler = (e) => {
+    if (!document.getElementById('arena-matchup')) return;
+    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if (isVoting) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handleVote('left');
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handleVote('right');
+    } else if (e.key.toLowerCase() === 's') {
+      loadNewMatchup();
+    }
+  };
+  document.addEventListener('keydown', keyHandler);
+}
+
+function loadNewMatchup() {
+  if (allNFTs.length < 2) return;
+
+  const maxMatches = Math.max(...allNFTs.map((n) => n.totalMatches || 0), 1);
+  const weights = allNFTs.map((n) => Math.max(1, maxMatches - (n.totalMatches || 0) + 10));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+  const pickPair = () => {
+    const leftIdx = weightedRandom(weights, totalWeight);
+    let rightIdx;
+    let attempts = 0;
+    do {
+      rightIdx = weightedRandom(weights, totalWeight);
+      attempts++;
+    } while (rightIdx === leftIdx && attempts < 50);
+
+    if (rightIdx === leftIdx) {
+      rightIdx = (leftIdx + 1) % allNFTs.length;
+    }
+    return [leftIdx, rightIdx];
+  };
+
+  let leftIdx;
+  let rightIdx;
+  let pairKey;
+  let attempts = 0;
+
+  do {
+    [leftIdx, rightIdx] = pickPair();
+    pairKey = [allNFTs[leftIdx].id, allNFTs[rightIdx].id].sort().join('_');
+    attempts++;
+  } while (sessionVotedPairs.has(pairKey) && attempts < MAX_PAIR_ATTEMPTS);
+
+  currentPair = [allNFTs[leftIdx], allNFTs[rightIdx]];
+  renderMatchup();
+}
+
+function weightedRandom(weights, totalWeight) {
+  let random = Math.random() * totalWeight;
+  for (let i = 0; i < weights.length; i++) {
+    random -= weights[i];
+    if (random <= 0) return i;
+  }
+  return weights.length - 1;
+}
+
+function renderMatchup() {
+  const [left, right] = currentPair;
+  if (!left || !right) return;
+
+  const leftEl = document.getElementById('fighter-left');
+  const rightEl = document.getElementById('fighter-right');
+  if (leftEl) leftEl.classList.remove('fighter-winner', 'fighter-loser');
+  if (rightEl) rightEl.classList.remove('fighter-winner', 'fighter-loser');
+
+  document.querySelectorAll('.elo-change').forEach((el) => el.remove());
+
+  const leftImg = document.getElementById('fighter-left-img');
+  const leftName = document.getElementById('fighter-left-name');
+  const leftElo = document.getElementById('fighter-left-elo');
+  const leftWL = document.getElementById('fighter-left-wl');
+
+  if (leftImg) {
+    leftImg.src = left.image || FALLBACK_IMAGE;
+    leftImg.alt = left.name || 'Harmie';
+  }
+  if (leftName) leftName.textContent = left.name || 'Harmie';
+  if (leftElo) leftElo.textContent = String(left.eloScore || CONFIG.ELO_DEFAULT);
+  if (leftWL) leftWL.textContent = `${left.wins || 0}/${left.losses || 0}`;
+
+  const rightImg = document.getElementById('fighter-right-img');
+  const rightName = document.getElementById('fighter-right-name');
+  const rightElo = document.getElementById('fighter-right-elo');
+  const rightWL = document.getElementById('fighter-right-wl');
+
+  if (rightImg) {
+    rightImg.src = right.image || FALLBACK_IMAGE;
+    rightImg.alt = right.name || 'Harmie';
+  }
+  if (rightName) rightName.textContent = right.name || 'Harmie';
+  if (rightElo) rightElo.textContent = String(right.eloScore || CONFIG.ELO_DEFAULT);
+  if (rightWL) rightWL.textContent = `${right.wins || 0}/${right.losses || 0}`;
+
+  isVoting = false;
+}
+
+async function handleVote(side) {
+  if (isVoting) return;
+  if (!currentPair[0] || !currentPair[1]) return;
+  isVoting = true;
+
+  const winnerIdx = side === 'left' ? 0 : 1;
+  const loserIdx = side === 'left' ? 1 : 0;
+  const winner = currentPair[winnerIdx];
+  const loser = currentPair[loserIdx];
+
+  const pairKey = [winner.id, loser.id].sort().join('_');
+  sessionVotedPairs.add(pairKey);
+
+  showComicEffect();
+
+  const winnerEl = document.getElementById(side === 'left' ? 'fighter-left' : 'fighter-right');
+  const loserEl = document.getElementById(side === 'left' ? 'fighter-right' : 'fighter-left');
+
+  if (winnerEl) winnerEl.classList.add('fighter-winner');
+  if (loserEl) loserEl.classList.add('fighter-loser');
+
+  const eloResult = calculateElo(
+    winner.eloScore || CONFIG.ELO_DEFAULT,
+    loser.eloScore || CONFIG.ELO_DEFAULT,
+    winner.totalMatches || 0,
+    loser.totalMatches || 0,
+  );
+
+  showEloChange(winnerEl, `+${eloResult.winnerChange}`, true);
+  showEloChange(loserEl, `${eloResult.loserChange}`, false);
+
+  // Optimistic local update with rollback on failure
+  const snapshot = {
+    winner: { eloScore: winner.eloScore, totalMatches: winner.totalMatches, wins: winner.wins },
+    loser: { eloScore: loser.eloScore, totalMatches: loser.totalMatches, losses: loser.losses },
+    matchesPlayed,
+    streakCount,
+  };
+
+  winner.eloScore = (winner.eloScore || CONFIG.ELO_DEFAULT) + eloResult.winnerChange;
+  winner.totalMatches = (winner.totalMatches || 0) + 1;
+  winner.wins = (winner.wins || 0) + 1;
+  loser.eloScore = (loser.eloScore || CONFIG.ELO_DEFAULT) + eloResult.loserChange;
+  loser.totalMatches = (loser.totalMatches || 0) + 1;
+  loser.losses = (loser.losses || 0) + 1;
+
+  matchesPlayed++;
+  streakCount++;
+  localStorage.setItem('harmies_matches', String(matchesPlayed));
+  updateStatsDisplay();
+
+  if (isSupabaseReady()) {
+    try {
+      const result = await submitVote(winner.id, loser.id);
+      if (result?.error) {
+        rollback(winner, loser, snapshot, result.error);
+      }
+    } catch (err) {
+      rollback(winner, loser, snapshot, err?.message || 'Network error');
+    }
+  }
+
+  setTimeout(() => loadNewMatchup(), 1400);
+}
+
+function rollback(winner, loser, snapshot, message) {
+  winner.eloScore = snapshot.winner.eloScore;
+  winner.totalMatches = snapshot.winner.totalMatches;
+  winner.wins = snapshot.winner.wins;
+  loser.eloScore = snapshot.loser.eloScore;
+  loser.totalMatches = snapshot.loser.totalMatches;
+  loser.losses = snapshot.loser.losses;
+  matchesPlayed = snapshot.matchesPlayed;
+  streakCount = 0;
+  localStorage.setItem('harmies_matches', String(matchesPlayed));
+  updateStatsDisplay();
+  showToast(message || 'Vote rejected', 'error');
+}
+
+function updateStatsDisplay() {
+  const statMatches = document.getElementById('stat-matches');
+  const statStreak = document.getElementById('stat-streak');
+  if (statMatches) statMatches.textContent = String(matchesPlayed);
+  if (statStreak) statStreak.textContent = String(streakCount);
+}
+
+function calculateElo(winnerElo, loserElo, winnerMatches, loserMatches) {
+  const kWinner = winnerMatches >= CONFIG.ELO_THRESHOLD ? CONFIG.ELO_K_FACTOR_ESTABLISHED : CONFIG.ELO_K_FACTOR_NEW;
+  const kLoser = loserMatches >= CONFIG.ELO_THRESHOLD ? CONFIG.ELO_K_FACTOR_ESTABLISHED : CONFIG.ELO_K_FACTOR_NEW;
+
+  const expectedWinner = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
+  const expectedLoser = 1 / (1 + Math.pow(10, (winnerElo - loserElo) / 400));
+
+  const winnerChange = Math.round(kWinner * (1 - expectedWinner));
+  const loserChange = Math.round(kLoser * (0 - expectedLoser));
+
+  return {
+    winnerChange,
+    loserChange,
+    winnerNewElo: winnerElo + winnerChange,
+    loserNewElo: loserElo + loserChange,
+  };
+}
+
+function showComicEffect() {
+  const overlay = document.getElementById('comic-effect');
+  if (!overlay) return;
+
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+
+  const text = CONFIG.COMIC_EFFECTS[Math.floor(Math.random() * CONFIG.COMIC_EFFECTS.length)];
+
+  overlay.innerHTML = `
+    <div class="comic-starburst"></div>
+    <div class="comic-text">${escapeHtml(text)}</div>
+  `;
+  overlay.classList.remove('hidden');
+
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    overlay.innerHTML = '';
+  }, 700);
+}
+
+function showEloChange(element, text, isPositive) {
+  if (!element) return;
+
+  const el = document.createElement('div');
+  el.className = `elo-change ${isPositive ? 'positive' : 'negative'}`;
+  el.textContent = text;
+  element.style.position = 'relative';
+  element.appendChild(el);
+
+  setTimeout(() => el.remove(), 1300);
+}
+
+export function updateArenaData(nfts) {
+  allNFTs = nfts.filter((n) => n.image);
+  if (currentPair[0]) {
+    const u0 = allNFTs.find((n) => n.id === currentPair[0].id);
+    if (u0) currentPair[0] = u0;
+  }
+  if (currentPair[1]) {
+    const u1 = allNFTs.find((n) => n.id === currentPair[1].id);
+    if (u1) currentPair[1] = u1;
+  }
+}
