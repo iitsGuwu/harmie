@@ -1,5 +1,6 @@
 // Magic Eden API — Fetch listings and sales data
 import { CONFIG } from '../config.js';
+import { fetchMagicEdenWithRetry } from './meFetchRetry.js';
 
 const ME_BASE = CONFIG.ME_API_BASE;
 const SYMBOL = CONFIG.ME_COLLECTION_SYMBOL;
@@ -26,7 +27,7 @@ export async function fetchListings(onProgress) {
   while (hasMore) {
     try {
       const url = `${ME_BASE}/collections/${SYMBOL}/listings?offset=${offset}&limit=${limit}&listingAggMode=true`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
 
       if (!response.ok) {
         console.warn(`ME listings API returned ${response.status}`);
@@ -88,7 +89,7 @@ export async function fetchActivities(onProgress) {
   while (pages < maxPages) {
     try {
       const url = `${ME_BASE}/collections/${SYMBOL}/activities?offset=${offset}&limit=${limit}`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
 
       if (!response.ok) {
         console.warn(`ME activities API returned ${response.status}`);

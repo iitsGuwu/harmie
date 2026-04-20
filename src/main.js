@@ -113,7 +113,7 @@ async function initApp() {
     const cached = readCachedNFTs();
     if (cached && cached.length > 0) {
       allNFTs = cached;
-      if (cached.length >= MIN_EXPECTED_COLLECTION_SIZE) {
+      if (cached.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY) {
         primeNFTCache(cached);
       }
       updateLoading('Loading from cache...', 60);
@@ -250,7 +250,7 @@ function readCachedNFTs() {
     const parsed = JSON.parse(raw);
   if (!parsed || !Array.isArray(parsed.nfts)) return null;
   if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
-  if (parsed.nfts.length < MIN_EXPECTED_COLLECTION_SIZE) return null;
+  if (parsed.nfts.length < CONFIG.COLLECTION_EXPECTED_SUPPLY) return null;
   return parsed.nfts;
   } catch {
     return null;

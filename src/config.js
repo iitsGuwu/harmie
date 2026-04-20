@@ -8,6 +8,9 @@ export const CONFIG = {
   
   // Collection mint address
   COLLECTION_MINT: 'D67sv3pznj6qKkuY45K2uJrEGTtrWQVisD7opQ4ooM1s',
+
+  /** Full set size for this collection — used so caches are not treated complete at ~450. */
+  COLLECTION_EXPECTED_SUPPLY: 500,
   
   // Magic Eden API — proxied in both dev and prod
   ME_API_BASE: '/api/magiceden/v2',

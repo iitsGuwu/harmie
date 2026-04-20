@@ -67,7 +67,10 @@ export default async (request) => {
     });
     clearTimeout(timeout);
     const data = await upstream.text();
-    return new Response(data, { status: upstream.status, headers: baseHeaders });
+    const headers = { ...baseHeaders };
+    const ra = upstream.headers.get('Retry-After');
+    if (ra) headers['Retry-After'] = ra;
+    return new Response(data, { status: upstream.status, headers });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message || 'Upstream error' }), {
       status: 502,

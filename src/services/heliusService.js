@@ -2,15 +2,19 @@
 // Primary: Helius DAS (getAssetsByGroup → searchAssets). Magic Eden is used only
 // if Helius still returns an incomplete set, then listings/activities as last resort.
 import { CONFIG } from '../config.js';
-import { devWarn } from '../utils/dom.js';
+import { devWarn, devLog } from '../utils/dom.js';
+import { fetchMagicEdenWithRetry } from './meFetchRetry.js';
 
 let cachedNFTs = null;
 let cacheTimestamp = 0;
 
 const HELIUS_MAX_PAGES = 30;
 const ME_TOKEN_DETAIL_LIMIT = 600;
-const ME_TOKEN_DETAIL_CONCURRENCY = 8;
-/** Below this count, snapshots are treated as incomplete (refetch, no short-circuit cache). */
+const ME_TOKEN_DETAIL_CONCURRENCY = 4;
+/**
+ * Below this count, Helius is treated as incomplete: try `searchAssets`, then Magic Eden, etc.
+ * (Separate from `CONFIG.COLLECTION_EXPECTED_SUPPLY`, which gates “full” local / memory cache.)
+ */
 export const MIN_EXPECTED_COLLECTION_SIZE = 450;
 const ME_COLLECTION_TOKEN_LIMIT = 100;
 const ME_COLLECTION_TOKEN_MAX_PAGES = 60;
@@ -19,7 +23,7 @@ export async function fetchAllHarmies(onProgress) {
   if (
     cachedNFTs &&
     Date.now() - cacheTimestamp < CONFIG.CACHE_TTL_MS &&
-    cachedNFTs.length >= MIN_EXPECTED_COLLECTION_SIZE
+    cachedNFTs.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY
   ) {
     return cachedNFTs;
   }
@@ -73,7 +77,7 @@ export function primeNFTCache(nfts) {
   if (
     Array.isArray(nfts) &&
     nfts.length > 0 &&
-    nfts.length >= MIN_EXPECTED_COLLECTION_SIZE
+    nfts.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY
   ) {
     cachedNFTs = nfts;
     cacheTimestamp = Date.now();
@@ -158,7 +162,18 @@ async function fetchFromHelius(onProgress) {
       continue;
     }
 
-    break;
+    // No grand total (or already satisfied): if this page had any rows, Helius may still have
+    // more pages even when len < limit — do not stop here or we truncate the gallery.
+    if (items.length > 0) {
+      page++;
+      continue;
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    devLog(
+      `[Helius getAssetsByGroup] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal} expected=${CONFIG.COLLECTION_EXPECTED_SUPPLY}`,
+    );
   }
 
   return [...byId.values()];
@@ -243,7 +258,16 @@ async function fetchFromHeliusSearchAssets(onProgress) {
       continue;
     }
 
-    break;
+    if (items.length > 0) {
+      page++;
+      continue;
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    devLog(
+      `[Helius searchAssets] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal} expected=${CONFIG.COLLECTION_EXPECTED_SUPPLY}`,
+    );
   }
 
   return [...byId.values()];
@@ -260,13 +284,9 @@ async function fetchFromMagicEden(onProgress) {
   while (hasMore && pages < maxPages) {
     try {
       const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/listings?offset=${offset}&limit=${limit}&listingAggMode=true`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
 
       if (!response.ok) {
-        if (response.status === 429) {
-          await delay(2000);
-          continue;
-        }
         break;
       }
 
@@ -317,7 +337,7 @@ async function fetchFromMagicEden(onProgress) {
   while (actPages < 10) {
     try {
       const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/activities?offset=${actOffset}&limit=100`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
       if (!response.ok) break;
 
       const activities = await response.json();
@@ -361,7 +381,7 @@ async function fetchFromMagicEden(onProgress) {
     await runWithConcurrency(unknownMints, ME_TOKEN_DETAIL_CONCURRENCY, async (nft) => {
       try {
         const url = `${CONFIG.ME_API_BASE}/tokens/${nft.id}`;
-        const response = await fetch(url);
+        const response = await fetchMagicEdenWithRetry(url);
         if (response.ok) {
           const token = await response.json();
           nft.name = token.name || nft.name;
@@ -369,6 +389,7 @@ async function fetchFromMagicEden(onProgress) {
           nft.attributes = parseAttributes(token.attributes || []);
           nft.bgColor = (token.attributes || []).find((a) => a.trait_type === 'Background')?.value || null;
         }
+        await delay(120);
       } catch {
         /* ignore */
       } finally {
@@ -400,7 +421,7 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         ? `continuation=${encodeURIComponent(cursor)}&limit=${ME_COLLECTION_TOKEN_LIMIT}`
         : `offset=${offset}&limit=${ME_COLLECTION_TOKEN_LIMIT}`;
       const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/tokens?${qs}`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
       if (!response.ok) break;
 
       const payload = await response.json();
@@ -489,7 +510,7 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
       }
       offset += tokens.length;
       page++;
-      await delay(150);
+      await delay(400);
     } catch {
       break;
     }
@@ -629,7 +650,7 @@ async function enrichMissingFromMagicEden(nfts, onProgress) {
     await runWithConcurrency(slice, ME_TOKEN_DETAIL_CONCURRENCY, async (nft) => {
     try {
       const url = `${CONFIG.ME_API_BASE}/tokens/${nft.id}`;
-      const response = await fetch(url);
+      const response = await fetchMagicEdenWithRetry(url);
       if (!response.ok) return;
       const token = await response.json();
       const name = token.name || token.title;
@@ -659,6 +680,7 @@ async function enrichMissingFromMagicEden(nfts, onProgress) {
           rawAttrs.find?.((a) => a?.trait_type === 'Background')?.value ||
           null;
       }
+      await delay(100);
     } catch {
       /* ignore */
     } finally {
