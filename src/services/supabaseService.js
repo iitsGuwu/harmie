@@ -10,34 +10,58 @@ let isInitialized = false;
 let authSessionReady = false;
 
 export async function initSupabase() {
-  if (isInitialized) return true;
-
   if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
     devWarn('Supabase not configured. Voting will be disabled.');
     return false;
   }
 
-  try {
-    supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
-
+  if (isInitialized && supabase) {
     const {
+      data: { session: quick },
+    } = await supabase.auth.getSession();
+    if (quick?.user?.id) return true;
+    isInitialized = false;
+    authSessionReady = false;
+  }
+
+  try {
+    if (!supabase) {
+      supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          // Hash router uses #gallery / #arena; do not let GoTrue consume the hash.
+          detectSessionInUrl: false,
+          storageKey: 'harmie-supabase-auth',
+        },
+      });
+    }
+
+    let {
       data: { session: existing },
     } = await supabase.auth.getSession();
 
-    if (!existing) {
+    if (!existing?.user?.id) {
       const { error } = await supabase.auth.signInAnonymously();
       if (error) {
         devWarn('Anonymous sign-in failed:', error.message);
         devWarn('Enable Anonymous sign-ins in Supabase Auth → Providers.');
         supabase = null;
+        isInitialized = false;
+        authSessionReady = false;
         return false;
       }
+      ({
+        data: { session: existing },
+      } = await supabase.auth.getSession());
+    }
+
+    if (!existing?.user?.id) {
+      devWarn('Supabase session missing after sign-in.');
+      supabase = null;
+      isInitialized = false;
+      authSessionReady = false;
+      return false;
     }
 
     authSessionReady = true;
@@ -47,8 +71,15 @@ export async function initSupabase() {
   } catch (err) {
     devWarn('Supabase init error:', err);
     supabase = null;
+    isInitialized = false;
+    authSessionReady = false;
     return false;
   }
+}
+
+/** Call before voting; re-runs auth if the first init raced or the session was lost. */
+export async function ensureSupabaseForVoting() {
+  return initSupabase();
 }
 
 export async function submitVote(winnerId, loserId) {
