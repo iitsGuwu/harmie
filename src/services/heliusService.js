@@ -2,7 +2,7 @@
 // Primary: Helius DAS (getAssetsByGroup → searchAssets). Magic Eden is used only
 // if Helius still returns an incomplete set, then listings/activities as last resort.
 import { CONFIG } from '../config.js';
-import { devWarn, devLog } from '../utils/dom.js';
+import { devWarn, devLog, normalizeNftMediaUrl } from '../utils/dom.js';
 import { fetchMagicEdenWithRetry } from './meFetchRetry.js';
 
 let cachedNFTs = null;
@@ -109,11 +109,7 @@ export async function fetchAllHarmies(onProgress) {
 }
 
 export function primeNFTCache(nfts) {
-  if (
-    Array.isArray(nfts) &&
-    nfts.length > 0 &&
-    nfts.length > 0
-  ) {
+  if (Array.isArray(nfts) && nfts.length > 0) {
     cachedNFTs = nfts;
     cacheTimestamp = Date.now();
   }
@@ -336,7 +332,7 @@ async function fetchFromMagicEden(onProgress) {
         nftMap.set(mint, {
           id: mint,
           name: token.name || `Harmies #${mint.slice(0, 6)}`,
-          image: token.image || listing.extra?.img || '',
+          image: normalizeNftMediaUrl(token.image || listing.extra?.img || ''),
           description: '',
           attributes: parseAttributes(token.attributes || []),
           bgColor: (token.attributes || []).find((a) => a.trait_type === 'Background')?.value || null,
@@ -420,7 +416,7 @@ async function fetchFromMagicEden(onProgress) {
         if (response.ok) {
           const token = await response.json();
           nft.name = token.name || nft.name;
-          nft.image = token.image || '';
+          nft.image = normalizeNftMediaUrl(token.image || '') || nft.image;
           nft.attributes = parseAttributes(token.attributes || []);
           nft.bgColor = (token.attributes || []).find((a) => a.trait_type === 'Background')?.value || null;
         }
@@ -491,7 +487,9 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         nftMap.set(mint, {
           id: mint,
           name: t.name || t.title || token.name || token.title || `Harmies #${mint.slice(0, 6)}`,
-          image: t.image || t.img || t.imageUrl || token.image || token.img || token.imageUrl || '',
+          image: normalizeNftMediaUrl(
+            t.image || t.img || t.imageUrl || token.image || token.img || token.imageUrl || '',
+          ),
           description: t.description || token.description || '',
           attributes: parsedAttrs,
           bgColor:
@@ -588,7 +586,7 @@ function parseHeliusAsset(item) {
     return {
       id,
       name: metadata.name || `Harmies #${id.slice(0, 6)}`,
-      image: imageUrl,
+      image: normalizeNftMediaUrl(imageUrl),
       description: metadata.description || '',
       attributes: attributeMap,
       bgColor,
@@ -677,7 +675,7 @@ async function enrichMissingFromMagicEden(nfts, onProgress) {
         nft.name = name;
       }
       if (image && !String(nft.image || '').trim()) {
-        nft.image = image;
+        nft.image = normalizeNftMediaUrl(image);
       }
       const rawAttrs = token.attributes || token.traits || [];
       if (
@@ -745,7 +743,7 @@ export function mergeTwoNftRecords(a, b) {
   return {
     ...a,
     name: pickName(),
-    image: pickImage(),
+    image: normalizeNftMediaUrl(pickImage() || ''),
     description: (a.description || '').length >= (b.description || '').length ? a.description : b.description,
     attributes,
     bgColor: a.bgColor || b.bgColor,

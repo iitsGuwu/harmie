@@ -245,10 +245,10 @@ function readCachedNFTs() {
     const raw = localStorage.getItem(NFT_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-  if (!parsed || !Array.isArray(parsed.nfts)) return null;
-  if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
-  if (parsed.nfts.length === 0) return null;
-  return parsed.nfts;
+    if (!parsed || !Array.isArray(parsed.nfts)) return null;
+    if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
+    if (parsed.nfts.length === 0) return null;
+    return parsed.nfts;
   } catch {
     return null;
   }

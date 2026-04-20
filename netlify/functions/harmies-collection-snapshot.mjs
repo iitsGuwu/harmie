@@ -20,6 +20,17 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function normalizeNftMediaUrl(url) {
+  if (typeof url !== 'string') return '';
+  const s = url.trim();
+  if (!s) return '';
+  if (s.startsWith('ipfs://')) {
+    const rest = s.slice('ipfs://'.length).replace(/^ipfs\//, '');
+    return `https://ipfs.io/ipfs/${rest}`;
+  }
+  return s;
+}
+
 function collectionMint() {
   return (Netlify.env.get('COLLECTION_MINT') || '').trim() || '5yKCYuZCcJU3aXwppGK87Gi59T6ceNKrTzyXYvJfsp3q';
 }
@@ -60,7 +71,7 @@ function toNft(item) {
     return {
       id,
       name: metadata.name || `Harmies #${id.slice(0, 6)}`,
-      image: imageUrl,
+      image: normalizeNftMediaUrl(imageUrl),
       description: metadata.description || '',
       attributes: attributeMap,
       bgColor,

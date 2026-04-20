@@ -1,7 +1,7 @@
 // Supabase Service — votes and ELO; voter identity is Supabase Auth (anonymous or signed-in).
 import { createClient } from '@supabase/supabase-js';
 import { CONFIG } from '../config.js';
-import { devLog, devWarn } from '../utils/dom.js';
+import { devLog, devWarn, normalizeNftMediaUrl } from '../utils/dom.js';
 
 const G =
   typeof globalThis !== 'undefined'
@@ -253,7 +253,7 @@ export async function fetchAllHarmiesFromSupabase() {
       return {
         id: item.id,
         name: item.name || 'Unknown Harmie',
-        image: item.image_url || '',
+        image: normalizeNftMediaUrl(item.image_url || ''),
         description: metadata.description || '',
         attributes: attrs,
         bgColor: metadata.bgColor || attrs.Background || attrs.background || null,
@@ -273,9 +273,7 @@ export async function fetchAllHarmiesFromSupabase() {
   }
 }
 
-export async function syncNFTsToSupabase() {
-  return;
-}
+
 
 export function subscribeToEloUpdates(callback) {
   const client = supabase || G[GLOBAL_CLIENT_KEY];

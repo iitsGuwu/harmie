@@ -105,7 +105,8 @@ export function corsHeadersForAllowedRequest(request, allowMethods) {
       allowOrigin = allowed[0] || '*';
     }
   } else {
-    allowOrigin = '*';
+    // Disallowed origin — return no CORS headers so browsers block the response.
+    return { 'Vary': 'Origin' };
   }
   return {
     'Access-Control-Allow-Origin': allowOrigin,

@@ -236,6 +236,7 @@ function renderMatchup() {
   if (leftImg) {
     leftImg.src = left.image || FALLBACK_IMAGE;
     leftImg.alt = left.name || 'Harmie';
+    attachImageFallback(leftImg);
   }
   if (leftName) leftName.textContent = left.name || 'Harmie';
   if (leftElo) leftElo.textContent = String(left.eloScore || CONFIG.ELO_DEFAULT);
@@ -249,6 +250,7 @@ function renderMatchup() {
   if (rightImg) {
     rightImg.src = right.image || FALLBACK_IMAGE;
     rightImg.alt = right.name || 'Harmie';
+    attachImageFallback(rightImg);
   }
   if (rightName) rightName.textContent = right.name || 'Harmie';
   if (rightElo) rightElo.textContent = String(right.eloScore || CONFIG.ELO_DEFAULT);

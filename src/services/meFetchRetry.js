@@ -23,7 +23,18 @@ export async function fetchMagicEdenWithRetry(url, init = {}, options = {}) {
   let lastResponse = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const res = await fetch(url, init);
+    let res;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      // Network error (e.g. DNS failure, offline) — retry with backoff
+      if (attempt >= maxAttempts - 1) throw err;
+      const backoff = baseMs * 2 ** attempt + Math.random() * 500;
+      const wait = Math.min(Math.max(backoff, 400), 90_000);
+      devWarn(`Magic Eden network error on ${url.slice(0, 80)}… retry in ${Math.round(wait)}ms`);
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
     lastResponse = res;
     if (res.status !== 429 && res.status !== 503) return res;
     if (attempt >= maxAttempts - 1) return res;

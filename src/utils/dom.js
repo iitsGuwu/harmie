@@ -40,14 +40,61 @@ const FALLBACK_IMAGE_DATA_URL = (() => {
 
 export const FALLBACK_IMAGE = FALLBACK_IMAGE_DATA_URL;
 
+/** Turn ipfs://… into https so <img> can load it. */
+export function normalizeNftMediaUrl(url) {
+  if (typeof url !== 'string') return '';
+  const s = url.trim();
+  if (!s) return '';
+  if (s.startsWith('ipfs://')) {
+    const rest = s.slice('ipfs://'.length).replace(/^ipfs\//, '');
+    return `https://ipfs.io/ipfs/${rest}`;
+  }
+  return s;
+}
+
+/**
+ * For https URLs that already contain /ipfs/<cid>/…, try public gateways if the first host 404s
+ * (e.g. Pinata subdomain pin gone but CID still on the network).
+ */
+export function buildIpfsHttpGatewayCandidates(url) {
+  const u = normalizeNftMediaUrl(typeof url === 'string' ? url.trim() : '');
+  if (!u || !/^https?:\/\//i.test(u)) return [u].filter(Boolean);
+  const lower = u.toLowerCase();
+  if (!lower.includes('/ipfs/')) return [u];
+  const i = u.indexOf('/ipfs/');
+  if (i === -1) return [u];
+  const path = u.slice(i);
+  if (!/\/ipfs\/(Qm[1-9A-HJ-NP-Za-km-z]{44,}|bafy[a-z2-7]{50,})/i.test(path)) return [u];
+  const hosts = [
+    u,
+    `https://ipfs.io${path}`,
+    `https://cloudflare-ipfs.com${path}`,
+    `https://dweb.link${path}`,
+  ];
+  return [...new Set(hosts)];
+}
+
 export function attachImageFallback(img) {
   if (!img) return;
-  let triedFallback = false;
-  img.addEventListener('error', () => {
-    if (triedFallback) return;
-    triedFallback = true;
+  const raw = String(img.getAttribute('src') || img.src || '').trim();
+  const normalized = normalizeNftMediaUrl(raw);
+  if (normalized && normalized !== raw) {
+    img.setAttribute('src', normalized);
+    img.src = normalized;
+  }
+  const seed = String(img.getAttribute('src') || img.src || '').trim() || normalized;
+  const candidates = buildIpfsHttpGatewayCandidates(seed);
+  const list = candidates.length > 0 ? candidates : [FALLBACK_IMAGE_DATA_URL];
+  let idx = 0;
+  img.onerror = () => {
+    idx += 1;
+    if (idx < list.length) {
+      img.src = list[idx];
+      return;
+    }
+    img.onerror = null;
     img.src = FALLBACK_IMAGE_DATA_URL;
-  });
+  };
 }
 
 export function applyImageFallbacks(scope = document) {
