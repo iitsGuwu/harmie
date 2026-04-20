@@ -118,10 +118,6 @@ The Netlify functions in `netlify/functions/` proxy API requests to Helius and M
 
 Contributions are welcome! Please open an issue or pull request.
 
-## License
-
-[MIT](LICENSE)
-
 ---
 
 Built by [iitsGuru](https://x.com/iitsGuru). Not affiliated with [Neuko](https://www.neuko.ai/) or the [Harmony](https://www.harmonyrx.net/) project.
