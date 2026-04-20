@@ -2,7 +2,7 @@
 // Only forwards safe GET requests to allow-listed paths.
 
 import {
-  collectAllowedOrigins,
+  corsHeadersForAllowedRequest,
   originOrRefererAllowed,
   rateLimitMagicEden,
 } from './proxy-utils.mjs';
@@ -14,36 +14,17 @@ const ALLOWED_PATH_PATTERNS = [
   /^\/v2\/tokens\/[A-Za-z0-9]+$/,
 ];
 
-function corsHeaders(request) {
-  const origin = (request.headers.get('origin') || '').trim().replace(/\/+$/, '');
-  const allowed = collectAllowedOrigins();
-  let allowOrigin = '';
-  if (allowed.length === 0) {
-    allowOrigin = origin || '*';
-  } else if (origin && allowed.includes(origin)) {
-    allowOrigin = origin;
-  } else {
-    allowOrigin = allowed[0] || '*';
-  }
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Vary': 'Origin',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-}
-
 export default async (request) => {
   const baseHeaders = {
     'Content-Type': 'application/json',
-    ...corsHeaders(request),
+    ...corsHeadersForAllowedRequest(request, 'GET, OPTIONS'),
   };
 
   if (request.method === 'OPTIONS') {
     if (!originOrRefererAllowed(request)) {
       return new Response(null, { status: 403 });
     }
-    return new Response(null, { status: 204, headers: corsHeaders(request) });
+    return new Response(null, { status: 204, headers: corsHeadersForAllowedRequest(request, 'GET, OPTIONS') });
   }
 
   if (request.method !== 'GET') {

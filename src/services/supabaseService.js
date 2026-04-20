@@ -52,7 +52,7 @@ export async function initSupabase() {
         if (!existing?.user?.id) {
           const { error } = await supabase.auth.signInAnonymously();
           if (error) {
-            devWarn('Anonymous sign-in failed:', error.message, error);
+            devWarn('Anonymous sign-in failed:', error.message);
             devWarn('Supabase → Authentication → Providers: enable Anonymous sign-ins.');
             supabase = null;
             isInitialized = false;
@@ -97,7 +97,9 @@ export async function ensureSupabaseForVoting() {
 }
 
 export async function submitVote(winnerId, loserId) {
-  if (!supabase || !authSessionReady) return null;
+  if (!supabase || !authSessionReady) {
+    return { error: 'Voting is not ready yet. Refresh the page and try again.' };
+  }
 
   const {
     data: { session },

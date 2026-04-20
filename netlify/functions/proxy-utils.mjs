@@ -42,12 +42,30 @@ export function collectAllowedOrigins() {
   return [...new Set([...fromEnv, url, prime, ...local].filter(Boolean))];
 }
 
-export function originOrRefererAllowed(request) {
-  const allowed = collectAllowedOrigins();
-  if (allowed.length === 0) return true;
+function hostnameMatchesRequest(request, urlStr) {
+  const hostHdr = (request.headers.get('host') || '').split(':')[0].toLowerCase();
+  if (!hostHdr || !urlStr) return false;
+  try {
+    return new URL(urlStr).hostname.toLowerCase() === hostHdr;
+  } catch {
+    return false;
+  }
+}
 
+/**
+ * Allows: (1) browser same-origin (Origin/Referer host matches request Host — fixes custom domains
+ * without extra env), (2) explicit ALLOWED_ORIGINS / Netlify URL list.
+ * Does not allow arbitrary cross-origin callers when the allowlist is empty.
+ */
+export function originOrRefererAllowed(request) {
   const origin = normalizeOrigin(request.headers.get('origin'));
-  const referer = request.headers.get('referer') || '';
+  const referer = (request.headers.get('referer') || '').trim();
+
+  if (origin && hostnameMatchesRequest(request, origin)) return true;
+  if (referer && hostnameMatchesRequest(request, referer)) return true;
+
+  const allowed = collectAllowedOrigins();
+  if (allowed.length === 0) return false;
 
   for (const a of allowed) {
     if (origin && origin === a) return true;
@@ -64,6 +82,36 @@ export function forbiddenOriginResponse() {
     status: 403,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/** Reflect the caller's Origin when allowed (fixes custom domains vs Netlify URL list). */
+export function corsHeadersForAllowedRequest(request, allowMethods) {
+  const origin = normalizeOrigin(request.headers.get('origin'));
+  const referer = (request.headers.get('referer') || '').trim();
+  let allowOrigin = '';
+  if (originOrRefererAllowed(request)) {
+    if (origin) {
+      allowOrigin = origin;
+    } else if (referer) {
+      try {
+        allowOrigin = normalizeOrigin(new URL(referer).origin);
+      } catch {
+        allowOrigin = '';
+      }
+    }
+    if (!allowOrigin) {
+      const allowed = collectAllowedOrigins();
+      allowOrigin = allowed[0] || '*';
+    }
+  } else {
+    allowOrigin = '*';
+  }
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': allowMethods,
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
 }
 
 export function checkRateLimit(request, bucketSym, max, windowMs) {

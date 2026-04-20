@@ -2,43 +2,24 @@
 // API key stays server-side. JSON-RPC methods are allow-listed; origins gated.
 
 import {
-  collectAllowedOrigins,
+  corsHeadersForAllowedRequest,
   originOrRefererAllowed,
   rateLimitHelius,
 } from './proxy-utils.mjs';
 
 const HELIUS_ALLOWED_METHODS = new Set(['getAssetsByGroup', 'searchAssets']);
 
-function corsHeaders(request) {
-  const origin = (request.headers.get('origin') || '').trim().replace(/\/+$/, '');
-  const allowed = collectAllowedOrigins();
-  let allowOrigin = '';
-  if (allowed.length === 0) {
-    allowOrigin = origin || '*';
-  } else if (origin && allowed.includes(origin)) {
-    allowOrigin = origin;
-  } else {
-    allowOrigin = allowed[0] || '*';
-  }
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Vary': 'Origin',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-}
-
 export default async (request) => {
   const baseHeaders = {
     'Content-Type': 'application/json',
-    ...corsHeaders(request),
+    ...corsHeadersForAllowedRequest(request, 'POST, OPTIONS'),
   };
 
   if (request.method === 'OPTIONS') {
     if (!originOrRefererAllowed(request)) {
       return new Response(null, { status: 403 });
     }
-    return new Response(null, { status: 204, headers: corsHeaders(request) });
+    return new Response(null, { status: 204, headers: corsHeadersForAllowedRequest(request, 'POST, OPTIONS') });
   }
 
   if (request.method !== 'POST') {

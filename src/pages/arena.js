@@ -313,8 +313,8 @@ async function handleVote(side) {
 
   try {
     const result = await submitVote(winner.id, loser.id);
-    if (result?.error) {
-      rollback(winner, loser, snapshot, result.error);
+    if (!result || result.error) {
+      rollback(winner, loser, snapshot, result?.error || 'Vote could not be recorded.');
     }
   } catch (err) {
     rollback(winner, loser, snapshot, err?.message || 'Network error');
