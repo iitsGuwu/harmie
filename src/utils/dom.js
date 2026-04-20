@@ -68,7 +68,8 @@ export function buildIpfsHttpGatewayCandidates(url) {
   const hosts = [
     u,
     `https://ipfs.io${path}`,
-    `https://cloudflare-ipfs.com${path}`,
+    `https://nftstorage.link${path}`,
+    `https://w3s.link${path}`,
     `https://dweb.link${path}`,
   ];
   return [...new Set(hosts)];
