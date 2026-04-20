@@ -131,7 +131,6 @@ async function fetchByGroup(apiKey) {
       groupValue: mint,
       page,
       limit: LIMIT,
-      sortBy: { sortBy: 'created', sortDirection: 'asc' },
       options: { showGrandTotal: true },
     });
     if (data?.error) break;
@@ -185,7 +184,6 @@ async function fetchBySearch(apiKey) {
       tokenType: 'all',
       page,
       limit: LIMIT,
-      sortBy: { sortBy: 'id', sortDirection: 'asc' },
       options: { showUnverifiedCollections: true, showGrandTotal: true },
     });
     if (data?.error) break;

@@ -49,6 +49,10 @@ export function normalizeNftMediaUrl(url) {
     const rest = s.slice('ipfs://'.length).replace(/^ipfs\//, '');
     return `https://ipfs.io/ipfs/${rest}`;
   }
+  // Prevent bare filenames (like harmie_2.png) from triggering relative 404s
+  if (!/^https?:\/\//i.test(s) && !s.startsWith('data:')) {
+    return '';
+  }
   return s;
 }
 
@@ -60,18 +64,27 @@ export function buildIpfsHttpGatewayCandidates(url) {
   const u = normalizeNftMediaUrl(typeof url === 'string' ? url.trim() : '');
   if (!u || !/^https?:\/\//i.test(u)) return [u].filter(Boolean);
   const lower = u.toLowerCase();
-  if (!lower.includes('/ipfs/')) return [u];
+  
+  const hosts = [];
+  hosts.push(u);
+
+  // If it's a known failing Pinata or standard IPFS URL, try the ME CDN cache.
+  // Magic Eden aggressively caches NFT images, which is much more reliable than IPFS fallbacks.
+  if (lower.includes('/ipfs/') || lower.includes('mypinata.cloud')) {
+    hosts.push(`https://img.magiceden.io/rs:fill:400:400:0:0/plain/${encodeURIComponent(u)}`);
+  }
+
+  if (!lower.includes('/ipfs/')) return [...new Set(hosts)];
   const i = u.indexOf('/ipfs/');
-  if (i === -1) return [u];
+  if (i === -1) return [...new Set(hosts)];
   const path = u.slice(i);
-  if (!/\/ipfs\/(Qm[1-9A-HJ-NP-Za-km-z]{44,}|bafy[a-z2-7]{50,})/i.test(path)) return [u];
-  const hosts = [
-    u,
-    `https://ipfs.io${path}`,
-    `https://nftstorage.link${path}`,
-    `https://w3s.link${path}`,
-    `https://dweb.link${path}`,
-  ];
+  if (!/\/ipfs\/(Qm[1-9A-HJ-NP-Za-km-z]{44,}|bafy[a-z2-7]{50,})/i.test(path)) return [...new Set(hosts)];
+  
+  hosts.push(`https://ipfs.io${path}`);
+  hosts.push(`https://nftstorage.link${path}`);
+  hosts.push(`https://w3s.link${path}`);
+  hosts.push(`https://dweb.link${path}`);
+  
   return [...new Set(hosts)];
 }
 
