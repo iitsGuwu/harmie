@@ -3,19 +3,104 @@ import { createClient } from '@supabase/supabase-js';
 import { CONFIG } from '../config.js';
 import { devLog, devWarn } from '../utils/dom.js';
 
+const G =
+  typeof globalThis !== 'undefined'
+    ? globalThis
+    : typeof window !== 'undefined'
+      ? window
+      : {};
+
+const GLOBAL_CLIENT_KEY = '__harmieSupabaseClient_v2';
+const GLOBAL_INIT_KEY = '__harmieSupabaseInit_v2';
+
+let lastInitFailureMessage = '';
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * One client for the whole app (survives Vite HMR / duplicate module evaluation).
+ * Never destroy the client on auth errors — that was leaving multiple GoTrue instances alive.
+ */
+function getOrCreateSupabaseClient() {
+  if (G[GLOBAL_CLIENT_KEY]) {
+    return G[GLOBAL_CLIENT_KEY];
+  }
+  const client = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storageKey: 'harmie-supabase-auth-v2',
+    },
+  });
+  G[GLOBAL_CLIENT_KEY] = client;
+  return client;
+}
+
 let supabase = null;
-/** Ensures only one init runs at a time (avoids multiple GoTrueClient instances). */
-let initInflight = null;
 let lastVoteTime = 0;
 let isInitialized = false;
-/** True after we have a persisted Supabase session (anonymous is enough). */
 let authSessionReady = false;
+
+async function establishAnonymousSession(client) {
+  lastInitFailureMessage = '';
+  let {
+    data: { session },
+  } = await client.auth.getSession();
+
+  if (session?.user?.id) return true;
+
+  await client.auth.signOut({ scope: 'local' }).catch(() => {});
+
+  const maxAttempts = 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { error } = await client.auth.signInAnonymously();
+    if (!error) {
+      ({
+        data: { session },
+      } = await client.auth.getSession());
+      if (session?.user?.id) return true;
+      lastInitFailureMessage = 'Session did not persist after anonymous sign-in.';
+      return false;
+    }
+
+    const msg = (error.message || '').toLowerCase();
+    const code = error.status || error.code;
+    devWarn('Anonymous sign-in attempt failed:', error.message, code);
+
+    if (code === 422 || msg.includes('captcha') || msg.includes('hcaptcha') || msg.includes('turnstile')) {
+      lastInitFailureMessage =
+        'Sign-in was rejected (often captcha / bot protection). Supabase → Authentication → Attack Protection: turn off captcha for anonymous users, or complete captcha setup.';
+    } else if (msg.includes('disabled') || msg.includes('not allowed')) {
+      lastInitFailureMessage =
+        'Anonymous sign-ins may be disabled. Supabase → Authentication → Providers → Anonymous: enable.';
+    } else {
+      lastInitFailureMessage = error.message || 'Anonymous sign-in failed.';
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await delay(350 * (attempt + 1));
+      await client.auth.signOut({ scope: 'local' }).catch(() => {});
+    }
+  }
+
+  return false;
+}
+
+export function getLastSupabaseInitFailure() {
+  return lastInitFailureMessage;
+}
 
 export async function initSupabase() {
   if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
     devWarn('Supabase not configured. Voting will be disabled.');
+    lastInitFailureMessage = 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in the build.';
     return false;
   }
+
+  supabase = getOrCreateSupabaseClient();
 
   if (isInitialized && supabase) {
     try {
@@ -30,43 +115,14 @@ export async function initSupabase() {
     authSessionReady = false;
   }
 
-  if (!initInflight) {
-    initInflight = (async () => {
+  if (!G[GLOBAL_INIT_KEY]) {
+    G[GLOBAL_INIT_KEY] = (async () => {
       try {
-        if (!supabase) {
-          supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-            auth: {
-              persistSession: true,
-              autoRefreshToken: true,
-              // Hash router uses #gallery / #arena; do not let GoTrue consume the hash.
-              detectSessionInUrl: false,
-              storageKey: 'harmie-supabase-auth',
-            },
-          });
-        }
+        const client = getOrCreateSupabaseClient();
+        supabase = client;
 
-        let {
-          data: { session: existing },
-        } = await supabase.auth.getSession();
-
-        if (!existing?.user?.id) {
-          const { error } = await supabase.auth.signInAnonymously();
-          if (error) {
-            devWarn('Anonymous sign-in failed:', error.message);
-            devWarn('Supabase → Authentication → Providers: enable Anonymous sign-ins.');
-            supabase = null;
-            isInitialized = false;
-            authSessionReady = false;
-            return false;
-          }
-          ({
-            data: { session: existing },
-          } = await supabase.auth.getSession());
-        }
-
-        if (!existing?.user?.id) {
-          devWarn('Supabase session missing after sign-in.');
-          supabase = null;
+        const ok = await establishAnonymousSession(client);
+        if (!ok) {
           isInitialized = false;
           authSessionReady = false;
           return false;
@@ -74,24 +130,24 @@ export async function initSupabase() {
 
         authSessionReady = true;
         isInitialized = true;
+        lastInitFailureMessage = '';
         devLog('Supabase initialized (auth session ready)');
         return true;
       } catch (err) {
         devWarn('Supabase init error:', err);
-        supabase = null;
         isInitialized = false;
         authSessionReady = false;
+        lastInitFailureMessage = err?.message || 'Unexpected error during sign-in.';
         return false;
       } finally {
-        initInflight = null;
+        delete G[GLOBAL_INIT_KEY];
       }
     })();
   }
 
-  return initInflight;
+  return G[GLOBAL_INIT_KEY];
 }
 
-/** Call before voting; re-runs auth if the first init raced or the session was lost. */
 export async function ensureSupabaseForVoting() {
   return initSupabase();
 }
@@ -145,10 +201,11 @@ export async function submitVote(winnerId, loserId) {
 }
 
 export async function fetchEloScores() {
-  if (!supabase) return {};
+  const client = supabase || G[GLOBAL_CLIENT_KEY];
+  if (!client) return {};
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('harmies')
       .select('id, elo_score, total_matches, wins, losses')
       .order('elo_score', { ascending: false });
@@ -176,10 +233,11 @@ export async function fetchEloScores() {
 }
 
 export async function fetchAllHarmiesFromSupabase() {
-  if (!supabase) return [];
+  const client = supabase || G[GLOBAL_CLIENT_KEY];
+  if (!client) return [];
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('harmies')
       .select('id, name, image_url, metadata, elo_score, total_matches, wins, losses')
       .order('name', { ascending: true });
@@ -215,19 +273,15 @@ export async function fetchAllHarmiesFromSupabase() {
   }
 }
 
-/**
- * Collection rows must be seeded with the Supabase service_role key
- * (SQL editor, Edge Function, or CI script calling upsert_harmie).
- * The browser cannot call upsert_harmie after the security migration.
- */
 export async function syncNFTsToSupabase() {
   return;
 }
 
 export function subscribeToEloUpdates(callback) {
-  if (!supabase) return null;
+  const client = supabase || G[GLOBAL_CLIENT_KEY];
+  if (!client) return null;
 
-  return supabase
+  return client
     .channel('harmies-elo-changes')
     .on(
       'postgres_changes',
@@ -238,5 +292,5 @@ export function subscribeToEloUpdates(callback) {
 }
 
 export function isSupabaseReady() {
-  return isInitialized && !!supabase && authSessionReady;
+  return isInitialized && !!(supabase || G[GLOBAL_CLIENT_KEY]) && authSessionReady;
 }

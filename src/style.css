@@ -37,6 +37,10 @@
   --rank-top3-bg: #ffefc9;
   --rank-top3-border: #e6c06d;
   --rank-top3-text: #775719;
+  --podium-medal-fg: #4a3510;
+  --podium-medal-1-bg: #fff4d8;
+  --podium-medal-2-bg: #dfe5fb;
+  --podium-medal-3-bg: #f2e0d4;
   --nav-height: 76px;
   --radius: 16px;
   --radius-sm: 12px;
@@ -83,6 +87,10 @@ html[data-theme='light'] {
   --rank-top3-bg: #ffefc9;
   --rank-top3-border: #e6c06d;
   --rank-top3-text: #775719;
+  --podium-medal-fg: #3d3318;
+  --podium-medal-1-bg: #fff4d8;
+  --podium-medal-2-bg: #e8ecf8;
+  --podium-medal-3-bg: #f6e8df;
   --shadow-card: 0 8px 0 #1c2240;
   --shadow-soft: 0 10px 24px rgba(28, 34, 64, 0.12);
 }
@@ -124,6 +132,10 @@ html[data-theme='dark'] {
   --rank-top3-bg: #6a542a;
   --rank-top3-border: #a68849;
   --rank-top3-text: #ffeab9;
+  --podium-medal-fg: #fff8e8;
+  --podium-medal-1-bg: #5a4a28;
+  --podium-medal-2-bg: #2f3550;
+  --podium-medal-3-bg: #4a3830;
   --shadow-card: 0 8px 0 #060916;
   --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
@@ -1001,15 +1013,16 @@ button {
   display: grid;
   place-items: center;
   font-family: var(--font-head);
-  background: #fff4d8;
+  background: var(--podium-medal-1-bg);
+  color: var(--podium-medal-fg);
 }
 
 .podium-spot.second .podium-medal {
-  background: #f0f3fa;
+  background: var(--podium-medal-2-bg);
 }
 
 .podium-spot.third .podium-medal {
-  background: #f6e3d7;
+  background: var(--podium-medal-3-bg);
 }
 
 .podium-image {
@@ -1077,7 +1090,7 @@ button {
 
 .leaderboard-table td {
   padding: 12px 16px;
-  color: var(--text-muted);
+  color: var(--text);
   font-size: 0.9rem;
 }
 
@@ -1087,7 +1100,7 @@ button {
 }
 
 .lb-rank.top {
-  color: #9b6e00;
+  color: var(--rank-top10-text);
 }
 
 .lb-nft-cell {
@@ -1246,7 +1259,7 @@ button {
 
 .podium-record {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   margin-top: 2px;
 }
 
@@ -1265,6 +1278,19 @@ button {
 .empty-state-sub {
   margin-top: 8px;
   font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.leaderboard-page .empty-state {
+  color: var(--text);
+}
+
+.leaderboard-page .empty-state .empty-state-title {
+  color: var(--text-strong);
+}
+
+.leaderboard-page .empty-state > p:not(.empty-state-sub) {
+  color: var(--text-muted);
 }
 
 .inline-link {

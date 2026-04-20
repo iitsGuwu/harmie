@@ -135,9 +135,10 @@ export function checkRateLimit(request, bucketSym, max, windowMs) {
 
 /** Initial collection load can issue many parallel / sequential ME requests. */
 export function rateLimitHelius(request) {
-  return checkRateLimit(request, RL_HELIUS, 400, 60_000);
+  return checkRateLimit(request, RL_HELIUS, 800, 60_000);
 }
 
+/** High ceiling: collection token pagination issues many sequential GETs from one browser IP. */
 export function rateLimitMagicEden(request) {
-  return checkRateLimit(request, RL_ME, 2000, 60_000);
+  return checkRateLimit(request, RL_ME, 12_000, 60_000);
 }

@@ -217,6 +217,9 @@ DROP POLICY IF EXISTS "votes_insert" ON votes;
 DROP POLICY IF EXISTS "sessions_select" ON voter_sessions;
 DROP POLICY IF EXISTS "sessions_insert" ON voter_sessions;
 DROP POLICY IF EXISTS "sessions_update" ON voter_sessions;
+DROP POLICY IF EXISTS "harmies_read_all" ON harmies;
+DROP POLICY IF EXISTS "votes_read_all" ON votes;
+DROP POLICY IF EXISTS "sessions_read_all" ON voter_sessions;
 
 -- 8. RLS Policies — read-only for anon clients.
 --    All writes happen through the SECURITY DEFINER submit_vote() RPC.

@@ -1,5 +1,6 @@
 // NFT Collection Data Service
-// Primary: Helius DAS API (gets all 500). Fallback: Magic Eden + IPFS pattern.
+// Primary: Helius DAS (getAssetsByGroup → searchAssets). Magic Eden is used only
+// if Helius still returns an incomplete set, then listings/activities as last resort.
 import { CONFIG } from '../config.js';
 import { devWarn } from '../utils/dom.js';
 
@@ -23,28 +24,29 @@ export async function fetchAllHarmies(onProgress) {
     return cachedNFTs;
   }
 
-  if (onProgress) onProgress('Summoning the Harmies...', 10);
+  if (onProgress) onProgress('Loading from Helius…', 10);
 
   let allNFTs = await fetchFromHelius(onProgress);
 
-  // If Helius is unavailable or partial in production, pull the
-  // full collection token index from Magic Eden as a reliable fallback.
+  // Still Helius: alternate DAS method before touching Magic Eden.
   if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-    if (onProgress) onProgress('Reconciling full collection index...', 25);
-    const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
-    allNFTs = mergeById(allNFTs, meCollection);
-  }
-
-  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-    if (onProgress) onProgress('Trying alternate index...', 28);
+    if (onProgress) onProgress('Trying alternate Helius index…', 22);
     const search = await fetchFromHeliusSearchAssets(onProgress);
     allNFTs = mergeById(allNFTs, search);
   }
 
+  // Magic Eden: only if Helius (both methods) did not return a near-complete set.
+  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
+    if (onProgress) onProgress('Helius incomplete — falling back to Magic Eden collection…', 28);
+    const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
+    allNFTs = mergeById(allNFTs, meCollection);
+  }
+
+  // Optional metadata polish (ME per-mint) — does not replace Helius as source of truth.
   await enrichMissingFromMagicEden(allNFTs, onProgress);
 
   if (allNFTs.length === 0) {
-    if (onProgress) onProgress('Using Magic Eden data...', 20);
+    if (onProgress) onProgress('Helius empty — Magic Eden listings & activity…', 32);
     allNFTs = await fetchFromMagicEden(onProgress);
   }
 
@@ -162,7 +164,7 @@ async function fetchFromHelius(onProgress) {
   return [...byId.values()];
 }
 
-/** Fallback indexer path when getAssetsByGroup returns a short page before the full set. */
+/** Second Helius DAS path (same primary source as getAssetsByGroup). */
 async function fetchFromHeliusSearchAssets(onProgress) {
   const byId = new Map();
   let page = 1;

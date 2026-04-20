@@ -1,6 +1,10 @@
 // Battle Arena — Head-to-head voting system with ELO
 import { CONFIG } from '../config.js';
-import { submitVote, ensureSupabaseForVoting } from '../services/supabaseService.js';
+import {
+  submitVote,
+  ensureSupabaseForVoting,
+  getLastSupabaseInitFailure,
+} from '../services/supabaseService.js';
 import { showNFTModal } from '../components/modal.js';
 import { escapeHtml, attachImageFallback, FALLBACK_IMAGE } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
@@ -257,8 +261,10 @@ async function handleVote(side) {
   if (isVoting) return;
   if (!currentPair[0] || !currentPair[1]) return;
   if (!(await ensureSupabaseForVoting())) {
+    const detail = getLastSupabaseInitFailure();
     showToast(
-      'Could not start a voting session. In Supabase: Authentication → Providers → enable Anonymous sign-ins, then refresh this page.',
+      detail ||
+        'Could not start a voting session. Check Supabase → Authentication (Anonymous provider + Attack Protection / captcha), then refresh.',
       'error',
     );
     return;
