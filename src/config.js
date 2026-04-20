@@ -10,11 +10,8 @@ export const CONFIG = {
   HARMIES_COLLECTION_SNAPSHOT_URL: '/api/harmies-collection-snapshot',
   
   // Collection mint address
-  COLLECTION_MINT: 'D67sv3pznj6qKkuY45K2uJrEGTtrWQVisD7opQ4ooM1s',
+  COLLECTION_MINT: '5yKCYuZCcJU3aXwppGK87Gi59T6ceNKrTzyXYvJfsp3q',
 
-  /** Full set size for this collection — used so caches are not treated complete at ~450. */
-  COLLECTION_EXPECTED_SUPPLY: 500,
-  
   // Magic Eden API — proxied in both dev and prod
   ME_API_BASE: '/api/magiceden/v2',
   ME_COLLECTION_SYMBOL: 'harmies',

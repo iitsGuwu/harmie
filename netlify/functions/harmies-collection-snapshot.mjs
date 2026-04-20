@@ -12,7 +12,6 @@ import {
 } from './proxy-utils.mjs';
 
 const ELO_DEFAULT = 1200;
-const MIN_ACCEPT = 450;
 const MAX_PAGES = 35;
 const LIMIT = 1000;
 const RPC_PAGE_RETRIES = 5;
@@ -22,7 +21,7 @@ function sleep(ms) {
 }
 
 function collectionMint() {
-  return (Netlify.env.get('COLLECTION_MINT') || '').trim() || 'D67sv3pznj6qKkuY45K2uJrEGTtrWQVisD7opQ4ooM1s';
+  return (Netlify.env.get('COLLECTION_MINT') || '').trim() || '5yKCYuZCcJU3aXwppGK87Gi59T6ceNKrTzyXYvJfsp3q';
 }
 
 function parseAttributes(attrs) {
@@ -274,13 +273,14 @@ export default async (request) => {
   let merged = new Map();
 
   for (let round = 0; round < 3; round++) {
+    const beforeRound = merged.size;
     const g = await fetchByGroup(apiKey);
     merged = mergeIdMapsPreferRicher(merged, g);
     await sleep(250 + round * 150);
     const s = await fetchBySearch(apiKey);
     merged = mergeIdMapsPreferRicher(merged, s);
 
-    if (merged.size >= MIN_ACCEPT) break;
+    if (merged.size <= beforeRound) break;
     await sleep(1800 + round * 1200);
   }
 
@@ -288,7 +288,7 @@ export default async (request) => {
 
   return new Response(
     JSON.stringify({
-      ok: nfts.length >= MIN_ACCEPT,
+      ok: nfts.length > 0,
       count: nfts.length,
       nfts,
     }),

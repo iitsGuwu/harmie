@@ -1,4 +1,4 @@
-// Gallery Page — Browse and sort 500 Harmies
+// Gallery Page — Browse and sort the full collection
 import { showNFTModal } from '../components/modal.js';
 import {
   escapeHtml,

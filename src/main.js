@@ -4,7 +4,6 @@ import { CONFIG } from './config.js';
 import {
   fetchAllHarmies,
   primeNFTCache,
-  MIN_EXPECTED_COLLECTION_SIZE,
   mergeTwoNftRecords,
 } from './services/heliusService.js';
 import { fetchListings, fetchActivities, mergeMarketplaceData } from './services/magicEdenService.js';
@@ -113,9 +112,7 @@ async function initApp() {
     const cached = readCachedNFTs();
     if (cached && cached.length > 0) {
       allNFTs = cached;
-      if (cached.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY) {
-        primeNFTCache(cached);
-      }
+      primeNFTCache(cached);
       updateLoading('Loading from cache...', 60);
     } else {
       updateLoading('Summoning the Harmies...', 20);
@@ -250,7 +247,7 @@ function readCachedNFTs() {
     const parsed = JSON.parse(raw);
   if (!parsed || !Array.isArray(parsed.nfts)) return null;
   if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
-  if (parsed.nfts.length < CONFIG.COLLECTION_EXPECTED_SUPPLY) return null;
+  if (parsed.nfts.length === 0) return null;
   return parsed.nfts;
   } catch {
     return null;

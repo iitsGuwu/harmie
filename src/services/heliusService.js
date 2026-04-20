@@ -11,11 +11,6 @@ let cacheTimestamp = 0;
 const HELIUS_MAX_PAGES = 30;
 const ME_TOKEN_DETAIL_LIMIT = 600;
 const ME_TOKEN_DETAIL_CONCURRENCY = 4;
-/**
- * Below this count, Helius is treated as incomplete: try `searchAssets`, then Magic Eden, etc.
- * (Separate from `CONFIG.COLLECTION_EXPECTED_SUPPLY`, which gates “full” local / memory cache.)
- */
-export const MIN_EXPECTED_COLLECTION_SIZE = 450;
 const ME_COLLECTION_TOKEN_LIMIT = 100;
 const ME_COLLECTION_TOKEN_MAX_PAGES = 60;
 
@@ -29,7 +24,7 @@ async function tryNetlifyCollectionSnapshot(onProgress) {
     const res = await fetch(path, { method: 'GET', credentials: 'same-origin' });
     if (!res.ok) return null;
     const body = await res.json();
-    if (!body?.nfts || !Array.isArray(body.nfts) || body.nfts.length < MIN_EXPECTED_COLLECTION_SIZE) {
+    if (!body?.nfts || !Array.isArray(body.nfts) || body.nfts.length === 0) {
       return null;
     }
     if (onProgress) {
@@ -45,7 +40,7 @@ export async function fetchAllHarmies(onProgress) {
   if (
     cachedNFTs &&
     Date.now() - cacheTimestamp < CONFIG.CACHE_TTL_MS &&
-    cachedNFTs.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY
+    cachedNFTs.length > 0
   ) {
     return cachedNFTs;
   }
@@ -53,16 +48,10 @@ export async function fetchAllHarmies(onProgress) {
   const snapshotNfts = await tryNetlifyCollectionSnapshot(onProgress);
   if (snapshotNfts) {
     let allNFTs = snapshotNfts;
-    if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-      await enrichMissingFromMagicEden(allNFTs, onProgress);
-    }
+    await enrichMissingFromMagicEden(allNFTs, onProgress);
     if (allNFTs.length === 0) {
       if (onProgress) onProgress('Helius empty — Magic Eden listings & activity…', 32);
       allNFTs = await fetchFromMagicEden(onProgress);
-    }
-    if (allNFTs.length === 0) {
-      if (onProgress) onProgress('Building from collection data...', 30);
-      allNFTs = generateFromKnownData();
     }
     allNFTs.sort((a, b) => {
       const numA = extractNumber(a.name);
@@ -80,42 +69,29 @@ export async function fetchAllHarmies(onProgress) {
 
   let allNFTs = await fetchFromHelius(onProgress);
 
-  // Merge search index whenever we are short of a full gallery — fills gaps getAssetsByGroup can miss.
-  if (allNFTs.length < CONFIG.COLLECTION_EXPECTED_SUPPLY) {
-    if (onProgress) onProgress('Merging Helius search index…', 18);
-    allNFTs = mergeById(allNFTs, await fetchFromHeliusSearchAssets(onProgress));
-  }
-
-  // Brief Helius retries (indexer can return transient partial pages on cold load).
-  for (let attempt = 0; attempt < 2 && allNFTs.length < CONFIG.COLLECTION_EXPECTED_SUPPLY; attempt++) {
-    if (allNFTs.length >= MIN_EXPECTED_COLLECTION_SIZE) break;
-    const waitMs = 2000 + attempt * 2000;
+  // Always merge search index and a couple of retries; stop if no new NFTs are found.
+  if (onProgress) onProgress('Merging Helius search index…', 18);
+  allNFTs = mergeById(allNFTs, await fetchFromHeliusSearchAssets(onProgress));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const before = allNFTs.length;
+    const waitMs = 1500 + attempt * 1500;
     if (onProgress) onProgress('Helius partial — retrying…', 20 + attempt * 2);
     await delay(waitMs);
     allNFTs = mergeById(allNFTs, await fetchFromHelius(onProgress));
     allNFTs = mergeById(allNFTs, await fetchFromHeliusSearchAssets(onProgress));
+    if (allNFTs.length <= before) break;
   }
 
-  // Magic Eden collection tokens only if Helius is still far short (shared ME IP rate limits hard).
-  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-    if (onProgress) onProgress('Helius incomplete — falling back to Magic Eden collection…', 28);
-    const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
-    allNFTs = mergeById(allNFTs, meCollection);
-  }
+  // Always try collection tokens as an additive merge (not a threshold fallback).
+  if (onProgress) onProgress('Merging Magic Eden collection index…', 28);
+  const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
+  allNFTs = mergeById(allNFTs, meCollection);
 
-  // Per-mint ME polish — skip when Helius already returned a large set to avoid ME 429 on shared egress.
-  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-    await enrichMissingFromMagicEden(allNFTs, onProgress);
-  }
+  await enrichMissingFromMagicEden(allNFTs, onProgress);
 
   if (allNFTs.length === 0) {
     if (onProgress) onProgress('Helius empty — Magic Eden listings & activity…', 32);
     allNFTs = await fetchFromMagicEden(onProgress);
-  }
-
-  if (allNFTs.length === 0) {
-    if (onProgress) onProgress('Building from collection data...', 30);
-    allNFTs = generateFromKnownData();
   }
 
   allNFTs.sort((a, b) => {
@@ -136,7 +112,7 @@ export function primeNFTCache(nfts) {
   if (
     Array.isArray(nfts) &&
     nfts.length > 0 &&
-    nfts.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY
+    nfts.length > 0
   ) {
     cachedNFTs = nfts;
     cacheTimestamp = Date.now();
@@ -231,7 +207,7 @@ async function fetchFromHelius(onProgress) {
 
   if (import.meta.env.DEV) {
     devLog(
-      `[Helius getAssetsByGroup] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal} expected=${CONFIG.COLLECTION_EXPECTED_SUPPLY}`,
+      `[Helius getAssetsByGroup] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal}`,
     );
   }
 
@@ -325,7 +301,7 @@ async function fetchFromHeliusSearchAssets(onProgress) {
 
   if (import.meta.env.DEV) {
     devLog(
-      `[Helius searchAssets] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal} expected=${CONFIG.COLLECTION_EXPECTED_SUPPLY}`,
+      `[Helius searchAssets] unique mints=${byId.size} reportedTotal=${reportedTotal === Number.POSITIVE_INFINITY ? '?' : reportedTotal}`,
     );
   }
 
@@ -576,29 +552,6 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
   }
 
   return [...nftMap.values()];
-}
-
-function generateFromKnownData() {
-  const nfts = [];
-  for (let i = 1; i <= 500; i++) {
-    nfts.push({
-      id: `harmie_placeholder_${i}`,
-      name: `Harmies #${i}`,
-      image: '',
-      description: '',
-      attributes: {},
-      bgColor: null,
-      owner: null,
-      listPrice: null,
-      highestSale: null,
-      eloScore: CONFIG.ELO_DEFAULT,
-      rank: null,
-      totalMatches: 0,
-      wins: 0,
-      losses: 0,
-    });
-  }
-  return nfts;
 }
 
 function parseAttributes(attrs) {
