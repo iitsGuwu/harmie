@@ -261,7 +261,18 @@ $$;
 REVOKE ALL ON FUNCTION upsert_harmie(TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION upsert_harmie(TEXT, TEXT, TEXT, JSONB) TO service_role;
 
--- 12. Enable realtime for the harmies table
-ALTER PUBLICATION supabase_realtime ADD TABLE harmies;
+-- 12. Enable realtime for the harmies table (safe if already published)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'harmies'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE harmies;
+  END IF;
+END $$;
 
 -- Done! Your Harmie Charm Arena database is ready.
