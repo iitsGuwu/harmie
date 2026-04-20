@@ -32,22 +32,33 @@ export async function fetchAllHarmies(onProgress) {
 
   let allNFTs = await fetchFromHelius(onProgress);
 
-  // Still Helius: alternate DAS method before touching Magic Eden.
-  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
-    if (onProgress) onProgress('Trying alternate Helius index…', 22);
-    const search = await fetchFromHeliusSearchAssets(onProgress);
-    allNFTs = mergeById(allNFTs, search);
+  // Merge search index whenever we are short of a full gallery — fills gaps getAssetsByGroup can miss.
+  if (allNFTs.length < CONFIG.COLLECTION_EXPECTED_SUPPLY) {
+    if (onProgress) onProgress('Merging Helius search index…', 18);
+    allNFTs = mergeById(allNFTs, await fetchFromHeliusSearchAssets(onProgress));
   }
 
-  // Magic Eden: only if Helius (both methods) did not return a near-complete set.
+  // Brief Helius retries (indexer can return transient partial pages on cold load).
+  for (let attempt = 0; attempt < 2 && allNFTs.length < CONFIG.COLLECTION_EXPECTED_SUPPLY; attempt++) {
+    if (allNFTs.length >= MIN_EXPECTED_COLLECTION_SIZE) break;
+    const waitMs = 2000 + attempt * 2000;
+    if (onProgress) onProgress('Helius partial — retrying…', 20 + attempt * 2);
+    await delay(waitMs);
+    allNFTs = mergeById(allNFTs, await fetchFromHelius(onProgress));
+    allNFTs = mergeById(allNFTs, await fetchFromHeliusSearchAssets(onProgress));
+  }
+
+  // Magic Eden collection tokens only if Helius is still far short (shared ME IP rate limits hard).
   if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
     if (onProgress) onProgress('Helius incomplete — falling back to Magic Eden collection…', 28);
     const meCollection = await fetchFromMagicEdenCollectionTokens(onProgress);
     allNFTs = mergeById(allNFTs, meCollection);
   }
 
-  // Optional metadata polish (ME per-mint) — does not replace Helius as source of truth.
-  await enrichMissingFromMagicEden(allNFTs, onProgress);
+  // Per-mint ME polish — skip when Helius already returned a large set to avoid ME 429 on shared egress.
+  if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
+    await enrichMissingFromMagicEden(allNFTs, onProgress);
+  }
 
   if (allNFTs.length === 0) {
     if (onProgress) onProgress('Helius empty — Magic Eden listings & activity…', 32);
@@ -421,7 +432,7 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
         ? `continuation=${encodeURIComponent(cursor)}&limit=${ME_COLLECTION_TOKEN_LIMIT}`
         : `offset=${offset}&limit=${ME_COLLECTION_TOKEN_LIMIT}`;
       const url = `${CONFIG.ME_API_BASE}/collections/${CONFIG.ME_COLLECTION_SYMBOL}/tokens?${qs}`;
-      const response = await fetchMagicEdenWithRetry(url);
+      const response = await fetchMagicEdenWithRetry(url, {}, { maxAttempts: 10, baseMs: 1000 });
       if (!response.ok) break;
 
       const payload = await response.json();
@@ -510,7 +521,7 @@ async function fetchFromMagicEdenCollectionTokens(onProgress) {
       }
       offset += tokens.length;
       page++;
-      await delay(400);
+      await delay(600);
     } catch {
       break;
     }
