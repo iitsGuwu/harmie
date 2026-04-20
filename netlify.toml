@@ -11,8 +11,7 @@
 [functions]
   node_bundler = "esbuild"
 
-[[functions]]
-  name = "harmies-collection-snapshot"
+[functions."harmies-collection-snapshot"]
   timeout = 45
 
 # SPA redirect
