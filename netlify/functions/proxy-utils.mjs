@@ -2,6 +2,7 @@
 
 const RL_HELIUS = Symbol.for('harmie.helius.rl');
 const RL_ME = Symbol.for('harmie.me.rl');
+const RL_SNAPSHOT = Symbol.for('harmie.collection-snapshot.rl');
 
 function clientIp(request) {
   return (
@@ -141,4 +142,9 @@ export function rateLimitHelius(request) {
 /** High ceiling: collection token pagination issues many sequential GETs from one browser IP. */
 export function rateLimitMagicEden(request) {
   return checkRateLimit(request, RL_ME, 12_000, 60_000);
+}
+
+/** Expensive Helius aggregation — low per-IP limit; CDN cache reduces repeat hits. */
+export function rateLimitCollectionSnapshot(request) {
+  return checkRateLimit(request, RL_SNAPSHOT, 12, 60_000);
 }

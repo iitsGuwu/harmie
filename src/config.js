@@ -5,6 +5,9 @@ export const CONFIG = {
   // Helius DAS API — proxied in both dev (Vite proxy) and prod (Netlify Function)
   // The API key is appended server-side (in Vite proxy or Netlify Function) to hide it from the client
   HELIUS_RPC_URL: '/api/helius',
+
+  /** Netlify: server-built full collection (CDN-cached). Local dev skips if 404. */
+  HARMIES_COLLECTION_SNAPSHOT_URL: '/api/harmies-collection-snapshot',
   
   // Collection mint address
   COLLECTION_MINT: 'D67sv3pznj6qKkuY45K2uJrEGTtrWQVisD7opQ4ooM1s',

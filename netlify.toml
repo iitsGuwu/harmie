@@ -8,6 +8,13 @@
   # Optional: extra allowed browser origins for API proxies (comma-separated).
   # Netlify sets URL and DEPLOY_PRIME_URL automatically for primary / preview domains.
 
+[functions]
+  node_bundler = "esbuild"
+
+[[functions]]
+  name = "harmies-collection-snapshot"
+  timeout = 45
+
 # SPA redirect
 [[redirects]]
   from = "/*"

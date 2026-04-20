@@ -19,6 +19,28 @@ export const MIN_EXPECTED_COLLECTION_SIZE = 450;
 const ME_COLLECTION_TOKEN_LIMIT = 100;
 const ME_COLLECTION_TOKEN_MAX_PAGES = 60;
 
+/**
+ * Netlify-only: one server-side Helius aggregation (CDN-cached). Skips 404 in local Vite dev.
+ */
+async function tryNetlifyCollectionSnapshot(onProgress) {
+  const path = CONFIG.HARMIES_COLLECTION_SNAPSHOT_URL;
+  if (!path || typeof path !== 'string' || !path.startsWith('/')) return null;
+  try {
+    const res = await fetch(path, { method: 'GET', credentials: 'same-origin' });
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (!body?.nfts || !Array.isArray(body.nfts) || body.nfts.length < MIN_EXPECTED_COLLECTION_SIZE) {
+      return null;
+    }
+    if (onProgress) {
+      onProgress(`Loaded ${body.nfts.length} Harmies (server index)…`, 26);
+    }
+    return body.nfts;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAllHarmies(onProgress) {
   if (
     cachedNFTs &&
@@ -26,6 +48,32 @@ export async function fetchAllHarmies(onProgress) {
     cachedNFTs.length >= CONFIG.COLLECTION_EXPECTED_SUPPLY
   ) {
     return cachedNFTs;
+  }
+
+  const snapshotNfts = await tryNetlifyCollectionSnapshot(onProgress);
+  if (snapshotNfts) {
+    let allNFTs = snapshotNfts;
+    if (allNFTs.length < MIN_EXPECTED_COLLECTION_SIZE) {
+      await enrichMissingFromMagicEden(allNFTs, onProgress);
+    }
+    if (allNFTs.length === 0) {
+      if (onProgress) onProgress('Helius empty — Magic Eden listings & activity…', 32);
+      allNFTs = await fetchFromMagicEden(onProgress);
+    }
+    if (allNFTs.length === 0) {
+      if (onProgress) onProgress('Building from collection data...', 30);
+      allNFTs = generateFromKnownData();
+    }
+    allNFTs.sort((a, b) => {
+      const numA = extractNumber(a.name);
+      const numB = extractNumber(b.name);
+      if (numA !== null && numB !== null) return numA - numB;
+      return a.name.localeCompare(b.name);
+    });
+    if (onProgress) onProgress(`Loaded ${allNFTs.length} Harmies!`, 100);
+    cachedNFTs = allNFTs;
+    cacheTimestamp = Date.now();
+    return allNFTs;
   }
 
   if (onProgress) onProgress('Loading from Helius…', 10);
