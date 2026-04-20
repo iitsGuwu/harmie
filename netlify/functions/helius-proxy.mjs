@@ -110,6 +110,20 @@ export default async (request) => {
       body,
     });
     const data = await upstream.text();
+    if (upstream.status === 401) {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: parsed.jsonrpc || '2.0',
+          id: parsed.id ?? null,
+          error: {
+            code: -32001,
+            message:
+              'Helius returned 401 — verify HELIUS_API_KEY in Netlify env matches an active key from dashboard.helius.dev.',
+          },
+        }),
+        { status: 200, headers: baseHeaders },
+      );
+    }
     return new Response(data, { status: upstream.status, headers: baseHeaders });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message || 'Upstream error' }), {

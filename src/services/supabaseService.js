@@ -4,6 +4,8 @@ import { CONFIG } from '../config.js';
 import { devLog, devWarn } from '../utils/dom.js';
 
 let supabase = null;
+/** Ensures only one init runs at a time (avoids multiple GoTrueClient instances). */
+let initInflight = null;
 let lastVoteTime = 0;
 let isInitialized = false;
 /** True after we have a persisted Supabase session (anonymous is enough). */
@@ -16,65 +18,77 @@ export async function initSupabase() {
   }
 
   if (isInitialized && supabase) {
-    const {
-      data: { session: quick },
-    } = await supabase.auth.getSession();
-    if (quick?.user?.id) return true;
+    try {
+      const {
+        data: { session: quick },
+      } = await supabase.auth.getSession();
+      if (quick?.user?.id) return true;
+    } catch {
+      /* reconnect */
+    }
     isInitialized = false;
     authSessionReady = false;
   }
 
-  try {
-    if (!supabase) {
-      supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          // Hash router uses #gallery / #arena; do not let GoTrue consume the hash.
-          detectSessionInUrl: false,
-          storageKey: 'harmie-supabase-auth',
-        },
-      });
-    }
+  if (!initInflight) {
+    initInflight = (async () => {
+      try {
+        if (!supabase) {
+          supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              // Hash router uses #gallery / #arena; do not let GoTrue consume the hash.
+              detectSessionInUrl: false,
+              storageKey: 'harmie-supabase-auth',
+            },
+          });
+        }
 
-    let {
-      data: { session: existing },
-    } = await supabase.auth.getSession();
+        let {
+          data: { session: existing },
+        } = await supabase.auth.getSession();
 
-    if (!existing?.user?.id) {
-      const { error } = await supabase.auth.signInAnonymously();
-      if (error) {
-        devWarn('Anonymous sign-in failed:', error.message);
-        devWarn('Enable Anonymous sign-ins in Supabase Auth → Providers.');
+        if (!existing?.user?.id) {
+          const { error } = await supabase.auth.signInAnonymously();
+          if (error) {
+            devWarn('Anonymous sign-in failed:', error.message, error);
+            devWarn('Supabase → Authentication → Providers: enable Anonymous sign-ins.');
+            supabase = null;
+            isInitialized = false;
+            authSessionReady = false;
+            return false;
+          }
+          ({
+            data: { session: existing },
+          } = await supabase.auth.getSession());
+        }
+
+        if (!existing?.user?.id) {
+          devWarn('Supabase session missing after sign-in.');
+          supabase = null;
+          isInitialized = false;
+          authSessionReady = false;
+          return false;
+        }
+
+        authSessionReady = true;
+        isInitialized = true;
+        devLog('Supabase initialized (auth session ready)');
+        return true;
+      } catch (err) {
+        devWarn('Supabase init error:', err);
         supabase = null;
         isInitialized = false;
         authSessionReady = false;
         return false;
+      } finally {
+        initInflight = null;
       }
-      ({
-        data: { session: existing },
-      } = await supabase.auth.getSession());
-    }
-
-    if (!existing?.user?.id) {
-      devWarn('Supabase session missing after sign-in.');
-      supabase = null;
-      isInitialized = false;
-      authSessionReady = false;
-      return false;
-    }
-
-    authSessionReady = true;
-    isInitialized = true;
-    devLog('Supabase initialized (auth session ready)');
-    return true;
-  } catch (err) {
-    devWarn('Supabase init error:', err);
-    supabase = null;
-    isInitialized = false;
-    authSessionReady = false;
-    return false;
+    })();
   }
+
+  return initInflight;
 }
 
 /** Call before voting; re-runs auth if the first init raced or the session was lost. */

@@ -85,10 +85,11 @@ export function checkRateLimit(request, bucketSym, max, windowMs) {
   return null;
 }
 
+/** Initial collection load can issue many parallel / sequential ME requests. */
 export function rateLimitHelius(request) {
-  return checkRateLimit(request, RL_HELIUS, 90, 60_000);
+  return checkRateLimit(request, RL_HELIUS, 400, 60_000);
 }
 
 export function rateLimitMagicEden(request) {
-  return checkRateLimit(request, RL_ME, 200, 60_000);
+  return checkRateLimit(request, RL_ME, 2000, 60_000);
 }
