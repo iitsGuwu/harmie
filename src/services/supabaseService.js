@@ -173,10 +173,11 @@ export async function submitVote(winnerId, loserId) {
     const { data, error } = await supabase.rpc('submit_vote', {
       p_winner_id: winnerId,
       p_loser_id: loserId,
+      p_fingerprint: null,
     });
 
-    if (error) {
-      const msg = (error.message || '').toLowerCase();
+    if (error || (data && data.success === false)) {
+      const msg = (error?.message || data?.error || '').toLowerCase();
       if (msg.includes('not authenticated')) {
         return { error: 'Session expired — refresh the page to vote again.' };
       }
@@ -189,7 +190,10 @@ export async function submitVote(winnerId, loserId) {
       if (msg.includes('daily vote limit')) {
         return { error: 'Daily vote limit reached. Come back tomorrow!' };
       }
-      return { error: error.message || 'Failed to submit vote' };
+      if (msg.includes('not found')) {
+        return { error: 'One or both NFTs not found in database. The collection must be seeded!' };
+      }
+      return { error: error?.message || data?.error || 'Failed to submit vote' };
     }
 
     lastVoteTime = now;

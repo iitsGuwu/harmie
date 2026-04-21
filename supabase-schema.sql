@@ -92,12 +92,12 @@ DECLARE
 BEGIN
   v_voter_id := (SELECT auth.uid())::text;
   IF v_voter_id IS NULL OR length(v_voter_id) < 10 THEN
-    RAISE EXCEPTION 'Not authenticated';
+    RETURN jsonb_build_object('success', false, 'error', 'not authenticated');
   END IF;
 
   -- 0. Sanity check: winner and loser must be different
   IF p_winner_id = p_loser_id THEN
-    RAISE EXCEPTION 'Winner and loser cannot be the same NFT';
+    RETURN jsonb_build_object('success', false, 'error', 'Winner and loser cannot be the same NFT');
   END IF;
 
   -- 1. Check for duplicate pair vote within 24 hours
@@ -111,7 +111,7 @@ BEGIN
     AND created_at > NOW() - INTERVAL '24 hours';
 
   IF v_duplicate_count > 0 THEN
-    RAISE EXCEPTION 'You already voted on this matchup recently';
+    RETURN jsonb_build_object('success', false, 'error', 'duplicate/already voted');
   END IF;
 
   -- 2. Check daily vote limit
@@ -126,13 +126,13 @@ BEGIN
     END IF;
 
     IF v_votes_today >= 500 THEN
-      RAISE EXCEPTION 'Daily vote limit reached. Try again tomorrow!';
+      RETURN jsonb_build_object('success', false, 'error', 'daily vote limit reached');
     END IF;
 
     -- Rate limit: no more than 1 vote per 2 seconds
     IF v_session_record.last_vote_at IS NOT NULL AND
        v_session_record.last_vote_at > NOW() - INTERVAL '2 seconds' THEN
-      RAISE EXCEPTION 'Too many votes too fast. Slow down!';
+      RETURN jsonb_build_object('success', false, 'error', 'rate limit/too fast');
     END IF;
   END IF;
 
@@ -144,7 +144,7 @@ BEGIN
   FROM harmies WHERE id = p_loser_id;
 
   IF v_winner_elo IS NULL OR v_loser_elo IS NULL THEN
-    RAISE EXCEPTION 'One or both NFTs not found in database';
+    RETURN jsonb_build_object('success', false, 'error', 'One or both NFTs not found in database. The collection must be seeded!');
   END IF;
 
   -- 4. Calculate ELO changes
