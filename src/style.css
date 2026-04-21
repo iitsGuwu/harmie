@@ -558,7 +558,7 @@ button {
 }
 
 .gallery-page,
-.arena-page,
+.pageant-page,
 .leaderboard-page {
   max-width: 1420px;
   margin: 0 auto;
@@ -570,7 +570,7 @@ button {
 }
 
 .gallery-header,
-.arena-header,
+.pageant-header,
 .leaderboard-header {
   margin-bottom: 24px;
 }
@@ -754,7 +754,7 @@ button {
   box-shadow: 0 4px 0 var(--line);
 }
 
-.arena-prompt {
+.pageant-prompt {
   margin-bottom: 12px;
   text-align: center;
   font-family: var(--font-head);
@@ -763,25 +763,25 @@ button {
   color: var(--secondary);
 }
 
-.arena-matchup {
+.pageant-matchup {
   display: flex;
   align-items: stretch;
   justify-content: center;
   gap: 12px;
 }
 
-.arena-fighter {
+.pageant-contestant {
   flex: 1 1 0;
   max-width: 430px;
   cursor: pointer;
   transition: transform 0.16s ease;
 }
 
-.arena-fighter:hover {
+.pageant-contestant:hover {
   transform: translateY(-4px);
 }
 
-.fighter-panel {
+.contestant-panel {
   border: 3px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -789,23 +789,23 @@ button {
   box-shadow: var(--shadow-card), var(--shadow-soft);
 }
 
-.fighter-image-wrapper {
+.contestant-image-wrapper {
   aspect-ratio: 1;
   background: var(--bg-panel);
   border-bottom: 3px solid var(--line);
 }
 
-.fighter-image {
+.contestant-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fighter-info {
+.contestant-info {
   padding: 14px;
 }
 
-.fighter-name {
+.contestant-name {
   font-family: var(--font-head);
   letter-spacing: 0.05em;
   font-size: 1.3rem;
@@ -813,31 +813,31 @@ button {
   margin-bottom: 7px;
 }
 
-.fighter-stats {
+.contestant-stats {
   display: flex;
   gap: 12px;
   color: var(--text-muted);
   font-size: 0.82rem;
 }
 
-.fighter-stat {
+.contestant-stat {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
-.fighter-stat-value {
+.contestant-stat-value {
   color: var(--text);
   font-weight: 700;
 }
 
-.fighter-elo {
+.contestant-elo {
   color: var(--secondary);
   font-family: var(--font-head);
   font-size: 1.08rem;
 }
 
-.vs-badge {
+.star-badge {
   position: relative;
   width: 104px;
   flex: 0 0 104px;
@@ -845,7 +845,7 @@ button {
   place-items: center;
 }
 
-.vs-burst {
+.star-burst {
   position: absolute;
   inset: 10px;
   border-radius: 999px;
@@ -854,7 +854,7 @@ button {
   opacity: 0.45;
 }
 
-.vs-text {
+.star-text {
   position: relative;
   z-index: 1;
   font-family: var(--font-head);
@@ -862,13 +862,13 @@ button {
   font-size: 2.2rem;
 }
 
-.arena-actions {
+.pageant-actions {
   margin-top: 16px;
   display: flex;
   justify-content: center;
 }
 
-.arena-btn {
+.pageant-btn {
   padding: 9px 20px;
   border-radius: 11px;
   border: 2px solid var(--line);
@@ -878,11 +878,11 @@ button {
   box-shadow: 0 3px 0 var(--line);
 }
 
-.arena-btn:hover {
+.pageant-btn:hover {
   color: var(--text);
 }
 
-.arena-stats-bar {
+.pageant-stats-bar {
   margin-top: 20px;
   display: flex;
   justify-content: center;
@@ -890,29 +890,29 @@ button {
   gap: 24px;
 }
 
-.arena-stat {
+.pageant-stat {
   min-width: 120px;
   text-align: center;
 }
 
-.arena-stat-value {
+.pageant-stat-value {
   font-family: var(--font-head);
   font-size: 1.62rem;
   color: var(--text-strong);
 }
 
-.arena-stat-label {
+.pageant-stat-label {
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.75rem;
 }
 
-.fighter-winner .fighter-panel {
+.contestant-winner .contestant-panel {
   outline: 4px solid rgba(255, 190, 59, 0.45);
 }
 
-.fighter-loser {
+.contestant-loser {
   opacity: 0.45;
 }
 
@@ -940,7 +940,7 @@ button {
   to { opacity: 0; transform: translate(-50%, -110%); }
 }
 
-.comic-effect {
+.glamour-effect {
   position: fixed;
   inset: 0;
   z-index: 2100;
@@ -949,7 +949,7 @@ button {
   pointer-events: none;
 }
 
-.comic-starburst {
+.glamour-starburst {
   position: absolute;
   width: 360px;
   height: 360px;
@@ -960,7 +960,7 @@ button {
   animation: burst-pop 0.55s ease-out forwards;
 }
 
-.comic-text {
+.glamour-text {
   position: relative;
   z-index: 1;
   font-family: var(--font-head);
@@ -1431,12 +1431,12 @@ button {
     overflow: hidden;
   }
 
-  .arena-matchup {
+  .pageant-matchup {
     flex-direction: column;
     gap: 9px;
   }
 
-  .vs-badge {
+  .star-badge {
     width: 92px;
     flex-basis: 92px;
     align-self: center;
@@ -1460,7 +1460,7 @@ button {
 
 @media (max-width: 560px) {
   .gallery-page,
-  .arena-page,
+  .pageant-page,
   .leaderboard-page {
     padding: 24px 14px 44px;
   }

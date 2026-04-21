@@ -1,4 +1,4 @@
-// Harmies Arena Configuration
+// Harmies Pageant Configuration
 // All sensitive keys come from environment variables (see .env.example)
 
 export const CONFIG = {
@@ -41,6 +41,6 @@ export const CONFIG = {
   TENSOR_COLLECTION_URL: 'https://www.tensor.trade/trade/c7d45db9-0726-459c-bc42-afc8ee32e10a',
   ME_COLLECTION_URL: 'https://magiceden.io/marketplace/harmies',
   
-  // Comic text effects
-  COMIC_EFFECTS: ['KAPOW!', 'SLAM!', 'BOOM!', 'ZAP!', 'WHAM!', 'POW!', 'CRACK!', 'BANG!', 'SMASH!', 'KO!'],
+  // Pageant text effects
+  GLAMOUR_EFFECTS: ['SLAY!', 'FIERCE!', 'GORGEOUS!', 'STUNNING!', 'FLAWLESS!', 'SERVE!', 'ICONIC!', 'CHIC!', 'FABULOUS!'],
 };

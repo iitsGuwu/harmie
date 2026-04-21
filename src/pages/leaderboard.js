@@ -39,7 +39,7 @@ export function renderLeaderboard(container, nfts) {
             <span class="stat-value">${escapeHtml(leaderboardNFTs.length)}</span>
           </div>
           <div class="stat-badge">
-            <span>Total Matches:</span>
+            <span>Total Votes:</span>
             <span class="stat-value">${escapeHtml(totalMatches)}</span>
           </div>
         </div>
@@ -82,7 +82,7 @@ function renderPodium(top3) {
           <div class="podium-name">${escapeHtml(nft.name || 'Harmie')}</div>
           <div class="podium-elo">${escapeHtml(nft.eloScore || 1200)}</div>
           <div class="podium-record">
-            ${escapeHtml(nft.wins || 0)}W / ${escapeHtml(nft.losses || 0)}L
+            ${escapeHtml(nft.wins || 0)}Favored / ${escapeHtml(nft.losses || 0)}Passed
           </div>
         </div>
       `).join('')}
@@ -94,8 +94,8 @@ function renderNoVotesYet() {
   return `
     <div class="empty-state empty-state-large">
       <div class="empty-state-icon">${ICONS.duel}</div>
-      <h2 class="empty-state-title">NO BATTLES YET!</h2>
-      <p>Head to the <a class="inline-link" href="#arena">Battle Arena</a> and cast your first vote!</p>
+      <h2 class="empty-state-title">NO VOTES YET!</h2>
+      <p>Head to the <a class="inline-link" href="#pageant">Pageant</a> and cast your first vote!</p>
       <p class="empty-state-sub">Rankings will appear after the community starts voting.</p>
     </div>
   `;
@@ -110,8 +110,8 @@ function renderTable(nfts) {
             <th>Rank</th>
             <th>Harmie</th>
             <th>ELO</th>
-            <th>Win Rate</th>
-            <th>Matches</th>
+            <th>Favored %</th>
+            <th>Walks</th>
           </tr>
         </thead>
         <tbody>

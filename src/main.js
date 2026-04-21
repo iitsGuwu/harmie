@@ -14,14 +14,14 @@ import {
   subscribeToEloUpdates,
 } from './services/supabaseService.js';
 import { renderGallery, updateGalleryData } from './pages/gallery.js';
-import { renderArena, updateArenaData } from './pages/arena.js';
+import { renderPageant, updatePageantData } from './pages/pageant.js';
 import { renderLeaderboard, updateLeaderboardData } from './pages/leaderboard.js';
 import { devLog, devWarn } from './utils/dom.js';
 export { showToast } from './utils/toast.js';
 
 // App State
 let allNFTs = [];
-let currentPage = 'arena';
+let currentPage = 'pageant';
 let isLoading = true;
 let retryCount = 0;
 const MAX_RETRIES = 3;
@@ -105,7 +105,7 @@ async function initApp() {
   }
 
   try {
-    updateLoading('Connecting to the arena...', 10);
+    updateLoading('Connecting to the pageant...', 10);
     const supabaseInitPromise = initSupabase().catch(() => false);
 
     // Try warm cache first for an instant first paint
@@ -128,7 +128,7 @@ async function initApp() {
       return;
     }
 
-    updateLoading('Launching arena...', 92);
+    updateLoading('Launching pageant...', 92);
     setupNavigation();
     setupAutoRefresh();
 
@@ -313,9 +313,9 @@ function setupNavigation() {
 }
 
 function handleRoute() {
-  const hash = window.location.hash.replace('#', '') || 'arena';
-  const validPages = ['gallery', 'arena', 'leaderboard'];
-  currentPage = validPages.includes(hash) ? hash : 'arena';
+  const hash = window.location.hash.replace('#', '') || 'pageant';
+  const validPages = ['gallery', 'pageant', 'leaderboard'];
+  currentPage = validPages.includes(hash) ? hash : 'pageant';
 
   document.querySelectorAll('.nav-link').forEach((link) => {
     link.classList.toggle('active', link.dataset.page === currentPage);
@@ -336,8 +336,8 @@ function handleRoute() {
     case 'gallery':
       renderGallery(container, allNFTs);
       break;
-    case 'arena':
-      renderArena(container, allNFTs);
+    case 'pageant':
+      renderPageant(container, allNFTs);
       break;
     case 'leaderboard':
       renderLeaderboard(container, allNFTs);
@@ -354,8 +354,8 @@ function pushDataToCurrentPage() {
     case 'gallery':
       updateGalleryData(allNFTs);
       break;
-    case 'arena':
-      updateArenaData(allNFTs);
+    case 'pageant':
+      updatePageantData(allNFTs);
       break;
     case 'leaderboard':
       updateLeaderboardData(allNFTs);

@@ -75,7 +75,7 @@ export function renderGallery(container, nfts) {
     <div class="gallery-page">
       <div class="gallery-header">
         <h1 class="section-title">THE COLLECTION</h1>
-        <p class="section-subtitle">Browse all ${escapeHtml(totalCount)} Harmies in a bold modern comic interface</p>
+        <p class="section-subtitle">Browse all ${escapeHtml(totalCount)} Harmies in a bold modern glamorous interface</p>
 
         <div class="gallery-controls">
           <input

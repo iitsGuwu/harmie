@@ -1,4 +1,4 @@
-// Battle Arena — Head-to-head voting system with ELO
+// Pageant — Head-to-head voting system with ELO
 import { CONFIG } from '../config.js';
 import {
   submitVote,
@@ -11,7 +11,7 @@ import { showToast } from '../utils/toast.js';
 
 let allNFTs = [];
 let currentPair = [null, null];
-let matchesPlayed = 0;
+let votesCast = 0;
 let isVoting = false;
 let streakCount = 0;
 
@@ -20,59 +20,59 @@ const MAX_PAIR_ATTEMPTS = 25;
 
 let keyHandler = null;
 
-export function renderArena(container, nfts) {
+export function renderPageant(container, nfts) {
   allNFTs = nfts.filter((n) => n.image);
-  matchesPlayed = parseInt(localStorage.getItem('harmies_matches') || '0', 10) || 0;
+  votesCast = parseInt(localStorage.getItem('harmies_votes') || '0', 10) || 0;
 
   container.innerHTML = `
-    <div class="arena-page">
-      <div class="arena-header">
-        <h1 class="section-title">BATTLE ARENA</h1>
-        <p class="section-subtitle">Pick your favorite or the most charming! Your vote shapes the community rankings.</p>
+    <div class="pageant-page">
+      <div class="pageant-header">
+        <h1 class="section-title">PAGEANT</h1>
+        <p class="section-subtitle">Pick your favorite and most charming! Your vote shapes the community rankings.</p>
       </div>
 
-      <div class="arena-matchup" id="arena-matchup">
-        <div class="arena-fighter left" id="fighter-left" role="button" tabindex="0" aria-label="Vote for left Harmie">
-          <div class="fighter-panel">
-            <div class="fighter-image-wrapper">
-              <img class="fighter-image" id="fighter-left-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
+      <div class="pageant-matchup" id="pageant-matchup">
+        <div class="pageant-contestant left" id="contestant-left" role="button" tabindex="0" aria-label="Vote for left Harmie">
+          <div class="contestant-panel">
+            <div class="contestant-image-wrapper">
+              <img class="contestant-image" id="contestant-left-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
             </div>
-            <div class="fighter-info">
-              <div class="fighter-name" id="fighter-left-name">Loading...</div>
-              <div class="fighter-stats">
-                <div class="fighter-stat">
-                  <span>ELO:</span>
-                  <span class="fighter-elo" id="fighter-left-elo">—</span>
+            <div class="contestant-info">
+              <div class="contestant-name" id="contestant-left-name">Loading...</div>
+              <div class="contestant-stats">
+                <div class="contestant-stat">
+                  <span>Score:</span>
+                  <span class="contestant-elo" id="contestant-left-elo">—</span>
                 </div>
-                <div class="fighter-stat">
+                <div class="contestant-stat">
                   <span>W/L:</span>
-                  <span class="fighter-stat-value" id="fighter-left-wl">—</span>
+                  <span class="contestant-stat-value" id="contestant-left-wl">—</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="vs-badge" aria-hidden="true">
-          <div class="vs-burst"></div>
-          <span class="vs-text">VS</span>
+        <div class="star-badge" aria-hidden="true">
+          <div class="star-burst"></div>
+          <span class="star-text">⭐</span>
         </div>
 
-        <div class="arena-fighter right" id="fighter-right" role="button" tabindex="0" aria-label="Vote for right Harmie">
-          <div class="fighter-panel">
-            <div class="fighter-image-wrapper">
-              <img class="fighter-image" id="fighter-right-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
+        <div class="pageant-contestant right" id="contestant-right" role="button" tabindex="0" aria-label="Vote for right Harmie">
+          <div class="contestant-panel">
+            <div class="contestant-image-wrapper">
+              <img class="contestant-image" id="contestant-right-img" src="${escapeHtml(FALLBACK_IMAGE)}" alt="" data-fallback />
             </div>
-            <div class="fighter-info">
-              <div class="fighter-name" id="fighter-right-name">Loading...</div>
-              <div class="fighter-stats">
-                <div class="fighter-stat">
-                  <span>ELO:</span>
-                  <span class="fighter-elo" id="fighter-right-elo">—</span>
+            <div class="contestant-info">
+              <div class="contestant-name" id="contestant-right-name">Loading...</div>
+              <div class="contestant-stats">
+                <div class="contestant-stat">
+                  <span>Score:</span>
+                  <span class="contestant-elo" id="contestant-right-elo">—</span>
                 </div>
-                <div class="fighter-stat">
+                <div class="contestant-stat">
                   <span>W/L:</span>
-                  <span class="fighter-stat-value" id="fighter-right-wl">—</span>
+                  <span class="contestant-stat-value" id="contestant-right-wl">—</span>
                 </div>
               </div>
             </div>
@@ -80,22 +80,22 @@ export function renderArena(container, nfts) {
         </div>
       </div>
 
-      <div class="arena-actions">
-        <button class="arena-btn arena-btn-skip" id="arena-skip" type="button">SKIP →</button>
+      <div class="pageant-actions">
+        <button class="pageant-btn pageant-btn-skip" id="pageant-skip" type="button">SKIP →</button>
       </div>
 
-      <div class="arena-stats-bar">
-        <div class="arena-stat">
-          <div class="arena-stat-value" id="stat-matches">${escapeHtml(matchesPlayed)}</div>
-          <div class="arena-stat-label">Your Battles</div>
+      <div class="pageant-stats-bar">
+        <div class="pageant-stat">
+          <div class="pageant-stat-value" id="stat-votes">${escapeHtml(votesCast)}</div>
+          <div class="pageant-stat-label">Your Votes</div>
         </div>
-        <div class="arena-stat">
-          <div class="arena-stat-value" id="stat-streak">${escapeHtml(streakCount)}</div>
-          <div class="arena-stat-label">Streak</div>
+        <div class="pageant-stat">
+          <div class="pageant-stat-value" id="stat-streak">${escapeHtml(streakCount)}</div>
+          <div class="pageant-stat-label">Streak</div>
         </div>
-        <div class="arena-stat">
-          <div class="arena-stat-value" id="stat-total-nfts">${escapeHtml(allNFTs.length)}</div>
-          <div class="arena-stat-label">Harmies</div>
+        <div class="pageant-stat">
+          <div class="pageant-stat-value" id="stat-total-nfts">${escapeHtml(allNFTs.length)}</div>
+          <div class="pageant-stat-label">Harmies</div>
         </div>
       </div>
     </div>
@@ -104,23 +104,23 @@ export function renderArena(container, nfts) {
   container.querySelectorAll('img[data-fallback]').forEach(attachImageFallback);
 
   loadNewMatchup();
-  bindArenaEvents();
+  bindPageantEvents();
 }
 
-function bindArenaEvents() {
-  const leftFighter = document.getElementById('fighter-left');
-  const rightFighter = document.getElementById('fighter-right');
-  const skipBtn = document.getElementById('arena-skip');
+function bindPageantEvents() {
+  const leftContestant = document.getElementById('contestant-left');
+  const rightContestant = document.getElementById('contestant-right');
+  const skipBtn = document.getElementById('pageant-skip');
 
-  if (leftFighter) {
-    leftFighter.addEventListener('click', (e) => {
-      if (e.target.closest('.fighter-info')) {
+  if (leftContestant) {
+    leftContestant.addEventListener('click', (e) => {
+      if (e.target.closest('.contestant-info')) {
         showNFTModal(currentPair[0]);
         return;
       }
       handleVote('left');
     });
-    leftFighter.addEventListener('keydown', (e) => {
+    leftContestant.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         handleVote('left');
@@ -128,15 +128,15 @@ function bindArenaEvents() {
     });
   }
 
-  if (rightFighter) {
-    rightFighter.addEventListener('click', (e) => {
-      if (e.target.closest('.fighter-info')) {
+  if (rightContestant) {
+    rightContestant.addEventListener('click', (e) => {
+      if (e.target.closest('.contestant-info')) {
         showNFTModal(currentPair[1]);
         return;
       }
       handleVote('right');
     });
-    rightFighter.addEventListener('keydown', (e) => {
+    rightContestant.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         handleVote('right');
@@ -150,12 +150,12 @@ function bindArenaEvents() {
     });
   }
 
-  // Global keyboard shortcuts (only while arena is on screen)
+  // Global keyboard shortcuts (only while pageant is on screen)
   if (keyHandler) {
     document.removeEventListener('keydown', keyHandler);
   }
   keyHandler = (e) => {
-    if (!document.getElementById('arena-matchup')) return;
+    if (!document.getElementById('pageant-matchup')) return;
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
     if (isVoting) return;
     if (e.key === 'ArrowLeft') {
@@ -174,8 +174,8 @@ function bindArenaEvents() {
 function loadNewMatchup() {
   if (allNFTs.length < 2) return;
 
-  const maxMatches = Math.max(...allNFTs.map((n) => n.totalMatches || 0), 1);
-  const weights = allNFTs.map((n) => Math.max(1, maxMatches - (n.totalMatches || 0) + 10));
+  const maxWalks = Math.max(...allNFTs.map((n) => n.totalMatches || 0), 1);
+  const weights = allNFTs.map((n) => Math.max(1, maxWalks - (n.totalMatches || 0) + 10));
   const totalWeight = weights.reduce((a, b) => a + b, 0);
 
   const pickPair = () => {
@@ -221,17 +221,17 @@ function renderMatchup() {
   const [left, right] = currentPair;
   if (!left || !right) return;
 
-  const leftEl = document.getElementById('fighter-left');
-  const rightEl = document.getElementById('fighter-right');
-  if (leftEl) leftEl.classList.remove('fighter-winner', 'fighter-loser');
-  if (rightEl) rightEl.classList.remove('fighter-winner', 'fighter-loser');
+  const leftEl = document.getElementById('contestant-left');
+  const rightEl = document.getElementById('contestant-right');
+  if (leftEl) leftEl.classList.remove('contestant-winner', 'contestant-loser');
+  if (rightEl) rightEl.classList.remove('contestant-winner', 'contestant-loser');
 
   document.querySelectorAll('.elo-change').forEach((el) => el.remove());
 
-  const leftImg = document.getElementById('fighter-left-img');
-  const leftName = document.getElementById('fighter-left-name');
-  const leftElo = document.getElementById('fighter-left-elo');
-  const leftWL = document.getElementById('fighter-left-wl');
+  const leftImg = document.getElementById('contestant-left-img');
+  const leftName = document.getElementById('contestant-left-name');
+  const leftElo = document.getElementById('contestant-left-elo');
+  const leftWL = document.getElementById('contestant-left-wl');
 
   if (leftImg) {
     leftImg.src = left.image || FALLBACK_IMAGE;
@@ -242,10 +242,10 @@ function renderMatchup() {
   if (leftElo) leftElo.textContent = String(left.eloScore || CONFIG.ELO_DEFAULT);
   if (leftWL) leftWL.textContent = `${left.wins || 0}/${left.losses || 0}`;
 
-  const rightImg = document.getElementById('fighter-right-img');
-  const rightName = document.getElementById('fighter-right-name');
-  const rightElo = document.getElementById('fighter-right-elo');
-  const rightWL = document.getElementById('fighter-right-wl');
+  const rightImg = document.getElementById('contestant-right-img');
+  const rightName = document.getElementById('contestant-right-name');
+  const rightElo = document.getElementById('contestant-right-elo');
+  const rightWL = document.getElementById('contestant-right-wl');
 
   if (rightImg) {
     rightImg.src = right.image || FALLBACK_IMAGE;
@@ -281,13 +281,13 @@ async function handleVote(side) {
   const pairKey = [winner.id, loser.id].sort().join('_');
   sessionVotedPairs.add(pairKey);
 
-  showComicEffect();
+  showGlamourEffect();
 
-  const winnerEl = document.getElementById(side === 'left' ? 'fighter-left' : 'fighter-right');
-  const loserEl = document.getElementById(side === 'left' ? 'fighter-right' : 'fighter-left');
+  const winnerEl = document.getElementById(side === 'left' ? 'contestant-left' : 'contestant-right');
+  const loserEl = document.getElementById(side === 'left' ? 'contestant-right' : 'contestant-left');
 
-  if (winnerEl) winnerEl.classList.add('fighter-winner');
-  if (loserEl) loserEl.classList.add('fighter-loser');
+  if (winnerEl) winnerEl.classList.add('contestant-winner');
+  if (loserEl) loserEl.classList.add('contestant-loser');
 
   const eloResult = calculateElo(
     winner.eloScore || CONFIG.ELO_DEFAULT,
@@ -303,7 +303,7 @@ async function handleVote(side) {
   const snapshot = {
     winner: { eloScore: winner.eloScore, totalMatches: winner.totalMatches, wins: winner.wins },
     loser: { eloScore: loser.eloScore, totalMatches: loser.totalMatches, losses: loser.losses },
-    matchesPlayed,
+    votesCast,
     streakCount,
   };
 
@@ -314,9 +314,9 @@ async function handleVote(side) {
   loser.totalMatches = (loser.totalMatches || 0) + 1;
   loser.losses = (loser.losses || 0) + 1;
 
-  matchesPlayed++;
+  votesCast++;
   streakCount++;
-  localStorage.setItem('harmies_matches', String(matchesPlayed));
+  localStorage.setItem('harmies_votes', String(votesCast));
   updateStatsDisplay();
 
   try {
@@ -338,17 +338,17 @@ function rollback(winner, loser, snapshot, message) {
   loser.eloScore = snapshot.loser.eloScore;
   loser.totalMatches = snapshot.loser.totalMatches;
   loser.losses = snapshot.loser.losses;
-  matchesPlayed = snapshot.matchesPlayed;
+  votesCast = snapshot.votesCast;
   streakCount = 0;
-  localStorage.setItem('harmies_matches', String(matchesPlayed));
+  localStorage.setItem('harmies_votes', String(votesCast));
   updateStatsDisplay();
   showToast(message || 'Vote rejected', 'error');
 }
 
 function updateStatsDisplay() {
-  const statMatches = document.getElementById('stat-matches');
+  const statVotes = document.getElementById('stat-votes');
   const statStreak = document.getElementById('stat-streak');
-  if (statMatches) statMatches.textContent = String(matchesPlayed);
+  if (statVotes) statVotes.textContent = String(votesCast);
   if (statStreak) statStreak.textContent = String(streakCount);
 }
 
@@ -370,19 +370,19 @@ function calculateElo(winnerElo, loserElo, winnerMatches, loserMatches) {
   };
 }
 
-function showComicEffect() {
-  const overlay = document.getElementById('comic-effect');
+function showGlamourEffect() {
+  const overlay = document.getElementById('glamour-effect');
   if (!overlay) return;
 
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     return;
   }
 
-  const text = CONFIG.COMIC_EFFECTS[Math.floor(Math.random() * CONFIG.COMIC_EFFECTS.length)];
+  const text = CONFIG.GLAMOUR_EFFECTS[Math.floor(Math.random() * CONFIG.GLAMOUR_EFFECTS.length)];
 
   overlay.innerHTML = `
-    <div class="comic-starburst"></div>
-    <div class="comic-text">${escapeHtml(text)}</div>
+    <div class="glamour-starburst"></div>
+    <div class="glamour-text">${escapeHtml(text)}</div>
   `;
   overlay.classList.remove('hidden');
 
@@ -404,7 +404,7 @@ function showEloChange(element, text, isPositive) {
   setTimeout(() => el.remove(), 1300);
 }
 
-export function updateArenaData(nfts) {
+export function updatePageantData(nfts) {
   allNFTs = nfts.filter((n) => n.image);
   if (currentPair[0]) {
     const u0 = allNFTs.find((n) => n.id === currentPair[0].id);
