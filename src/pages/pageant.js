@@ -170,7 +170,7 @@ function bindPageantEvents() {
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
       if (!currentPair[0] || !currentPair[1]) return;
-      const text = `I'm judging the Harmies Pageant! 🔥\n\nCurrent voting streak: ${streakCount}\nWhich of these two is your favorite?\n\n${currentPair[0].image || ''}\n${currentPair[1].image || ''}\n\nCome cast your votes: https://harmies.com`;
+      const text = `I'm judging the Harmies Pageant! 🔥\n\nCurrent voting streak: ${streakCount}\nWhich of these two is your favorite?\n\nCome cast your votes: https://harmie.xyz`;
       const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
       window.open(url, '_blank');
     });

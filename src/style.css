@@ -772,6 +772,7 @@ button {
 
 .pageant-contestant {
   flex: 1 1 0;
+  min-width: 0;
   max-width: 430px;
   cursor: pointer;
   transition: transform 0.16s ease;
@@ -1544,5 +1545,28 @@ button {
 
   .modal-links {
     flex-direction: column;
+  }
+
+  .star-badge {
+    width: 64px;
+    flex-basis: 64px;
+  }
+
+  .star-badge svg {
+    transform: scale(0.7);
+  }
+
+  .contestant-info {
+    padding: 8px;
+  }
+
+  .contestant-name {
+    font-size: 1rem;
+  }
+
+  .contestant-stats {
+    gap: 6px;
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
