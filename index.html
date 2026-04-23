@@ -17,10 +17,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="preload" as="fetch" href="/harmies.json" crossorigin>
   <link rel="preconnect" href="https://hqadajoepgoefznsomcm.supabase.co">
   <link rel="dns-prefetch" href="https://hqadajoepgoefznsomcm.supabase.co">
   <link rel="manifest" href="/manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="/src/style.css" />
@@ -145,12 +145,5 @@
   </div>
 
   <script type="module" src="/src/main.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>

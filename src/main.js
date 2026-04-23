@@ -13,6 +13,10 @@ import {
   fetchAllHarmiesFromSupabase,
   subscribeToEloUpdates,
 } from './services/supabaseService.js';
+const THEME_KEY = 'harmies_theme_mode';
+const VALID_THEMES = new Set(['light', 'mid', 'dark']);
+const THEME_ORDER = ['light', 'mid', 'dark'];
+
 const NFT_META_CACHE_KEY = 'harmies_meta_v4';
 const NFT_DYN_CACHE_KEY = 'harmies_dyn_v4';
 const NFT_META_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -496,3 +500,9 @@ window.addEventListener('beforeunload', () => {
     try { realtimeChannel.unsubscribe(); } catch { /* ignore */ }
   }
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
