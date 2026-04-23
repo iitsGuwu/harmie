@@ -87,12 +87,12 @@ export function showNFTModal(nft) {
           <div class="modal-stat-value">${escapeHtml(saleText)}</div>
         </div>
         <div class="modal-stat">
-          <div class="modal-stat-label">Favored Rate</div>
+          <div class="modal-stat-label">Win Rate</div>
           <div class="modal-stat-value modal-stat-value-positive">${escapeHtml(winRate)}%</div>
         </div>
         <div class="modal-stat">
           <div class="modal-stat-label">Walks</div>
-          <div class="modal-stat-value">${escapeHtml(nft.totalMatches || 0)} (${escapeHtml(nft.wins || 0)} Favored / ${escapeHtml(nft.losses || 0)} Passed)</div>
+          <div class="modal-stat-value">${escapeHtml(nft.totalMatches || 0)} (${escapeHtml(nft.wins || 0)} W's / ${escapeHtml(nft.losses || 0)} L's)</div>
         </div>
       </div>
 

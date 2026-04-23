@@ -1,0 +1,17 @@
+{
+  "name": "Harmies Pageant",
+  "short_name": "Harmies",
+  "description": "Vote for your favorite Harmies in head-to-head charm contests.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1d2a78",
+  "theme_color": "#5b58e8",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

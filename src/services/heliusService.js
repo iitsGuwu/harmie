@@ -15,9 +15,23 @@ const ME_COLLECTION_TOKEN_LIMIT = 100;
 const ME_COLLECTION_TOKEN_MAX_PAGES = 60;
 
 /**
- * Netlify-only: one server-side Helius aggregation (CDN-cached). Skips 404 in local Vite dev.
+ * Try to load the static JSON built at build-time. Falls back to Netlify function if not available.
  */
 async function tryNetlifyCollectionSnapshot(onProgress) {
+  try {
+    // 1. First try the instant static JSON
+    const staticRes = await fetch('/harmies.json', { cache: 'force-cache' });
+    if (staticRes.ok) {
+      const body = await staticRes.json();
+      if (body?.nfts && Array.isArray(body.nfts) && body.nfts.length > 0) {
+        if (onProgress) onProgress(`Loaded ${body.nfts.length} Harmies (static index)…`, 26);
+        return body.nfts;
+      }
+    }
+  } catch (e) {
+    /* ignore fallback */
+  }
+
   const path = CONFIG.HARMIES_COLLECTION_SNAPSHOT_URL;
   if (!path || typeof path !== 'string' || !path.startsWith('/')) return null;
   try {

@@ -11,6 +11,7 @@ import { showToast } from '../utils/toast.js';
 
 let allNFTs = [];
 let currentPair = [null, null];
+let nextPair = null;
 let votesCast = 0;
 let isVoting = false;
 let streakCount = 0;
@@ -39,14 +40,19 @@ export function renderPageant(container, nfts) {
             </div>
             <div class="contestant-info">
               <div class="contestant-name" id="contestant-left-name">Loading...</div>
-              <div class="contestant-stats">
-                <div class="contestant-stat">
-                  <span>Score:</span>
-                  <span class="contestant-elo" id="contestant-left-elo">—</span>
-                </div>
-                <div class="contestant-stat">
-                  <span>W/L:</span>
-                  <span class="contestant-stat-value" id="contestant-left-wl">—</span>
+              <div class="contestant-stats-wrapper">
+                <button class="stats-reveal-btn" type="button" aria-label="Hold to reveal stats">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/></svg>
+                </button>
+                <div class="contestant-stats is-blurred">
+                  <div class="contestant-stat">
+                    <span>Score:</span>
+                    <span class="contestant-elo" id="contestant-left-elo">—</span>
+                  </div>
+                  <div class="contestant-stat">
+                    <span>W/L:</span>
+                    <span class="contestant-stat-value" id="contestant-left-wl">—</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -65,14 +71,19 @@ export function renderPageant(container, nfts) {
             </div>
             <div class="contestant-info">
               <div class="contestant-name" id="contestant-right-name">Loading...</div>
-              <div class="contestant-stats">
-                <div class="contestant-stat">
-                  <span>Score:</span>
-                  <span class="contestant-elo" id="contestant-right-elo">—</span>
-                </div>
-                <div class="contestant-stat">
-                  <span>W/L:</span>
-                  <span class="contestant-stat-value" id="contestant-right-wl">—</span>
+              <div class="contestant-stats-wrapper">
+                <button class="stats-reveal-btn" type="button" aria-label="Hold to reveal stats">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/></svg>
+                </button>
+                <div class="contestant-stats is-blurred">
+                  <div class="contestant-stat">
+                    <span>Score:</span>
+                    <span class="contestant-elo" id="contestant-right-elo">—</span>
+                  </div>
+                  <div class="contestant-stat">
+                    <span>W/L:</span>
+                    <span class="contestant-stat-value" id="contestant-right-wl">—</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -81,6 +92,9 @@ export function renderPageant(container, nfts) {
       </div>
 
       <div class="pageant-actions">
+        <button class="pageant-btn pageant-btn-share" id="pageant-share" type="button">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px; margin-bottom: 2px;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> SHARE
+        </button>
         <button class="pageant-btn pageant-btn-skip" id="pageant-skip" type="button">SKIP →</button>
       </div>
 
@@ -114,6 +128,7 @@ function bindPageantEvents() {
 
   if (leftContestant) {
     leftContestant.addEventListener('click', (e) => {
+      if (e.target.closest('.stats-reveal-btn')) return;
       if (e.target.closest('.contestant-info')) {
         showNFTModal(currentPair[0]);
         return;
@@ -130,6 +145,7 @@ function bindPageantEvents() {
 
   if (rightContestant) {
     rightContestant.addEventListener('click', (e) => {
+      if (e.target.closest('.stats-reveal-btn')) return;
       if (e.target.closest('.contestant-info')) {
         showNFTModal(currentPair[1]);
         return;
@@ -149,6 +165,29 @@ function bindPageantEvents() {
       if (!isVoting) loadNewMatchup();
     });
   }
+
+  const shareBtn = document.getElementById('pageant-share');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', () => {
+      if (!currentPair[0] || !currentPair[1]) return;
+      const text = `I'm judging the Harmies Pageant! 🔥\n\nCurrent voting streak: ${streakCount}\nWhich of these two is your favorite?\n\n${currentPair[0].image || ''}\n${currentPair[1].image || ''}\n\nCome cast your votes: https://harmies.com`;
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+    });
+  }
+
+  document.querySelectorAll('.stats-reveal-btn').forEach((btn) => {
+    const target = btn.nextElementSibling;
+    if (!target) return;
+    const show = (e) => { if (e) e.stopPropagation(); target.classList.remove('is-blurred'); };
+    const hide = (e) => { if (e) e.stopPropagation(); target.classList.add('is-blurred'); };
+    btn.addEventListener('mousedown', show);
+    btn.addEventListener('mouseup', hide);
+    btn.addEventListener('mouseleave', hide);
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); show(); }, { passive: false });
+    btn.addEventListener('touchend', hide);
+    btn.addEventListener('touchcancel', hide);
+  });
 
   // Global keyboard shortcuts (only while pageant is on screen)
   if (keyHandler) {
@@ -193,19 +232,41 @@ function loadNewMatchup() {
     return [leftIdx, rightIdx];
   };
 
-  let leftIdx;
-  let rightIdx;
-  let pairKey;
-  let attempts = 0;
+  if (!nextPair) {
+    let leftIdx, rightIdx, pairKey;
+    let attempts = 0;
+    do {
+      [leftIdx, rightIdx] = pickPair();
+      pairKey = [allNFTs[leftIdx].id, allNFTs[rightIdx].id].sort().join('_');
+      attempts++;
+    } while (sessionVotedPairs.has(pairKey) && attempts < MAX_PAIR_ATTEMPTS);
+    nextPair = [allNFTs[leftIdx], allNFTs[rightIdx]];
+  }
 
+  currentPair = nextPair;
+  
+  const matchupContainer = document.getElementById('pageant-matchup');
+  if (matchupContainer) {
+    matchupContainer.classList.remove('fade-out-scale');
+    matchupContainer.classList.add('fade-in-scale');
+    setTimeout(() => matchupContainer.classList.remove('fade-in-scale'), 300);
+  }
+
+  renderMatchup();
+
+  // Pre-calculate and pre-load the next pair
+  let leftIdx, rightIdx, pairKey;
+  let attempts = 0;
   do {
     [leftIdx, rightIdx] = pickPair();
     pairKey = [allNFTs[leftIdx].id, allNFTs[rightIdx].id].sort().join('_');
     attempts++;
   } while (sessionVotedPairs.has(pairKey) && attempts < MAX_PAIR_ATTEMPTS);
+  
+  nextPair = [allNFTs[leftIdx], allNFTs[rightIdx]];
 
-  currentPair = [allNFTs[leftIdx], allNFTs[rightIdx]];
-  renderMatchup();
+  if (nextPair[0] && nextPair[0].image) new Image().src = nextPair[0].image;
+  if (nextPair[1] && nextPair[1].image) new Image().src = nextPair[1].image;
 }
 
 function weightedRandom(weights, totalWeight) {
@@ -328,7 +389,12 @@ async function handleVote(side) {
     rollback(winner, loser, snapshot, err?.message || 'Network error');
   }
 
-  setTimeout(() => loadNewMatchup(), 1400);
+  setTimeout(() => {
+    const container = document.getElementById('pageant-matchup');
+    if (container) container.classList.add('fade-out-scale');
+  }, 1200);
+
+  setTimeout(() => loadNewMatchup(), 1500);
 }
 
 function rollback(winner, loser, snapshot, message) {

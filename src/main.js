@@ -13,25 +13,10 @@ import {
   fetchAllHarmiesFromSupabase,
   subscribeToEloUpdates,
 } from './services/supabaseService.js';
-import { renderGallery, updateGalleryData } from './pages/gallery.js';
-import { renderPageant, updatePageantData } from './pages/pageant.js';
-import { renderLeaderboard, updateLeaderboardData } from './pages/leaderboard.js';
-import { devLog, devWarn } from './utils/dom.js';
-export { showToast } from './utils/toast.js';
-
-// App State
-let allNFTs = [];
-let currentPage = 'pageant';
-let isLoading = true;
-let retryCount = 0;
-const MAX_RETRIES = 3;
-
-const THEME_KEY = 'harmies_theme_mode';
-const VALID_THEMES = new Set(['light', 'mid', 'dark']);
-const THEME_ORDER = ['light', 'mid', 'dark'];
-
-const NFT_CACHE_KEY = 'harmies_nft_cache_v3';
-const NFT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache
+const NFT_META_CACHE_KEY = 'harmies_meta_v4';
+const NFT_DYN_CACHE_KEY = 'harmies_dyn_v4';
+const NFT_META_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const NFT_DYN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache for dynamic data
 
 let realtimeChannel = null;
 let refreshInterval = null;
@@ -121,7 +106,11 @@ async function initApp() {
       });
     }
 
-    await supabaseInitPromise;
+    const startingHash = window.location.hash.replace('#', '') || 'pageant';
+    const needsSupabaseImmediately = startingHash === 'pageant';
+    if (needsSupabaseImmediately) {
+      await supabaseInitPromise;
+    }
 
     if (allNFTs.length === 0) {
       updateLoading('Could not load NFTs. Please refresh later.', 0);
@@ -132,13 +121,11 @@ async function initApp() {
     setupNavigation();
     setupAutoRefresh();
 
-    handleRoute();
-
     updateLoading('LET\'S GO!', 100);
     isLoading = false;
-    // Re-render now that loading has completed; avoids spinner-only state
-    // until users navigate manually.
-    handleRoute();
+    
+    // Defer async route rendering
+    handleRoute().catch(devWarn);
 
     setTimeout(() => {
       if (loadingScreen) loadingScreen.classList.add('fade-out');
@@ -242,13 +229,35 @@ function mergeFreshNfts(existing, fresh) {
 
 function readCachedNFTs() {
   try {
-    const raw = localStorage.getItem(NFT_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.nfts)) return null;
-    if (Date.now() - (parsed.timestamp || 0) > NFT_CACHE_TTL_MS) return null;
-    if (parsed.nfts.length === 0) return null;
-    return parsed.nfts;
+    const rawMeta = localStorage.getItem(NFT_META_CACHE_KEY);
+    const rawDyn = localStorage.getItem(NFT_DYN_CACHE_KEY);
+    if (!rawMeta) return null;
+
+    const parsedMeta = JSON.parse(rawMeta);
+    if (!parsedMeta || !Array.isArray(parsedMeta.nfts)) return null;
+    if (Date.now() - (parsedMeta.timestamp || 0) > NFT_META_TTL_MS) return null;
+
+    const metaNfts = parsedMeta.nfts;
+    if (metaNfts.length === 0) return null;
+
+    let parsedDyn = null;
+    if (rawDyn) {
+      parsedDyn = JSON.parse(rawDyn);
+      if (Date.now() - (parsedDyn.timestamp || 0) > NFT_DYN_TTL_MS) {
+        parsedDyn = null;
+      }
+    }
+
+    if (parsedDyn && parsedDyn.nfts) {
+      const dynMap = parsedDyn.nfts;
+      for (const meta of metaNfts) {
+        const dyn = dynMap[meta.id];
+        if (dyn) {
+          Object.assign(meta, dyn);
+        }
+      }
+    }
+    return metaNfts;
   } catch {
     return null;
   }
@@ -256,24 +265,35 @@ function readCachedNFTs() {
 
 function writeCachedNFTs(nfts) {
   try {
-    const slim = nfts.map((n) => ({
+    const slimMeta = nfts.map((n) => ({
       id: n.id,
       name: n.name,
       image: n.image,
       bgColor: n.bgColor,
       attributes: n.attributes,
       owner: n.owner,
-      listPrice: n.listPrice,
-      highestSale: n.highestSale,
-      eloScore: n.eloScore,
-      rank: n.rank,
-      totalMatches: n.totalMatches,
-      wins: n.wins,
-      losses: n.losses,
     }));
+
+    const dynMap = {};
+    for (const n of nfts) {
+      dynMap[n.id] = {
+        listPrice: n.listPrice,
+        highestSale: n.highestSale,
+        eloScore: n.eloScore,
+        rank: n.rank,
+        totalMatches: n.totalMatches,
+        wins: n.wins,
+        losses: n.losses,
+      };
+    }
+
     localStorage.setItem(
-      NFT_CACHE_KEY,
-      JSON.stringify({ timestamp: Date.now(), nfts: slim }),
+      NFT_META_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), nfts: slimMeta }),
+    );
+    localStorage.setItem(
+      NFT_DYN_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), nfts: dynMap }),
     );
   } catch {
     /* quota or serialization errors are non-fatal */
@@ -312,7 +332,7 @@ function setupNavigation() {
   });
 }
 
-function handleRoute() {
+async function handleRoute() {
   const hash = window.location.hash.replace('#', '') || 'pageant';
   const validPages = ['gallery', 'pageant', 'leaderboard'];
   currentPage = validPages.includes(hash) ? hash : 'pageant';
@@ -332,16 +352,27 @@ function handleRoute() {
     return;
   }
 
+  // Ensure Supabase is awake for the pageant page if they just navigated here
+  if (currentPage === 'pageant') {
+    initSupabase().catch(() => false);
+  }
+
   switch (currentPage) {
-    case 'gallery':
+    case 'gallery': {
+      const { renderGallery } = await import('./pages/gallery.js');
       renderGallery(container, allNFTs);
       break;
-    case 'pageant':
+    }
+    case 'pageant': {
+      const { renderPageant } = await import('./pages/pageant.js');
       renderPageant(container, allNFTs);
       break;
-    case 'leaderboard':
+    }
+    case 'leaderboard': {
+      const { renderLeaderboard } = await import('./pages/leaderboard.js');
       renderLeaderboard(container, allNFTs);
       break;
+    }
   }
 
   const prefersReducedMotion = window.matchMedia
@@ -349,17 +380,23 @@ function handleRoute() {
   window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
 }
 
-function pushDataToCurrentPage() {
+async function pushDataToCurrentPage() {
   switch (currentPage) {
-    case 'gallery':
+    case 'gallery': {
+      const { updateGalleryData } = await import('./pages/gallery.js');
       updateGalleryData(allNFTs);
       break;
-    case 'pageant':
+    }
+    case 'pageant': {
+      const { updatePageantData } = await import('./pages/pageant.js');
       updatePageantData(allNFTs);
       break;
-    case 'leaderboard':
+    }
+    case 'leaderboard': {
+      const { updateLeaderboardData } = await import('./pages/leaderboard.js');
       updateLeaderboardData(allNFTs);
       break;
+    }
   }
 }
 

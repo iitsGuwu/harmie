@@ -82,7 +82,7 @@ function renderPodium(top3) {
           <div class="podium-name">${escapeHtml(nft.name || 'Harmie')}</div>
           <div class="podium-elo">${escapeHtml(nft.eloScore || 1200)}</div>
           <div class="podium-record">
-            ${escapeHtml(nft.wins || 0)}Favored / ${escapeHtml(nft.losses || 0)}Passed
+            ${escapeHtml(nft.wins || 0)} W's / ${escapeHtml(nft.losses || 0)} L's
           </div>
         </div>
       `).join('')}
@@ -110,7 +110,7 @@ function renderTable(nfts) {
             <th>Rank</th>
             <th>Harmie</th>
             <th>ELO</th>
-            <th>Favored %</th>
+            <th>Win %</th>
             <th>Walks</th>
           </tr>
         </thead>

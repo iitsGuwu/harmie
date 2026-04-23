@@ -247,7 +247,7 @@ export default async (request) => {
   const baseHeaders = {
     'Content-Type': 'application/json',
     ...corsHeadersForAllowedRequest(request, 'GET, OPTIONS'),
-    'Cache-Control': 'public, max-age=120, s-maxage=300, stale-while-revalidate=900',
+    'Cache-Control': 'public, max-age=120, s-maxage=3600, stale-while-revalidate=86400',
   };
 
   if (request.method === 'OPTIONS') {

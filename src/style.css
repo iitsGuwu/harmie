@@ -813,11 +813,53 @@ button {
   margin-bottom: 7px;
 }
 
+.contestant-stats-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.stats-reveal-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.stats-reveal-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .contestant-stats {
   display: flex;
   gap: 12px;
   color: var(--text-muted);
   font-size: 0.82rem;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.contestant-stats.is-blurred {
+  filter: blur(8px);
+  opacity: 0.6;
+  user-select: none;
+  pointer-events: none;
 }
 
 .contestant-stat {
@@ -913,7 +955,25 @@ button {
 }
 
 .contestant-loser {
-  opacity: 0.45;
+  opacity: 0.35;
+  filter: grayscale(100%);
+  transform: scale(0.95);
+  transition: all 0.5s ease;
+}
+
+.fade-out-scale {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-in-scale {
+  animation: fade-in-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes fade-in-pop {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .elo-change {
@@ -1429,11 +1489,6 @@ button {
 
   body.mobile-menu-open {
     overflow: hidden;
-  }
-
-  .pageant-matchup {
-    flex-direction: column;
-    gap: 9px;
   }
 
   .star-badge {

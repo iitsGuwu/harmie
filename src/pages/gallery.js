@@ -206,10 +206,10 @@ function loadMoreNFTs() {
 
   const filtered = searchQuery
     ? currentNFTs.filter((nft) =>
-        (nft.name && String(nft.name).toLowerCase().includes(searchQuery)) ||
-        extractHarmieNumber(nft).toString().includes(searchQuery) ||
-        (nft.bgColor && String(nft.bgColor).toLowerCase().includes(searchQuery))
-      )
+      (nft.name && String(nft.name).toLowerCase().includes(searchQuery)) ||
+      extractHarmieNumber(nft).toString().includes(searchQuery) ||
+      (nft.bgColor && String(nft.bgColor).toLowerCase().includes(searchQuery))
+    )
     : currentNFTs;
 
   if (filtered.length === 0) {
