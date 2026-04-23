@@ -986,18 +986,18 @@ button {
   opacity: 0.35;
   filter: grayscale(100%);
   transform: scale(0.95);
-  transition: all 0.5s ease;
+  transition: all 0.35s ease;
 }
 
 .fade-out-scale {
   opacity: 0;
   transform: scale(0.95);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.21s ease, transform 0.21s ease;
   pointer-events: none;
 }
 
 .fade-in-scale {
-  animation: fade-in-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: fade-in-pop 0.21s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 @keyframes fade-in-pop {
@@ -1013,7 +1013,7 @@ button {
   font-family: var(--font-head);
   font-size: 2rem;
   color: var(--text-strong);
-  animation: elo-float 1.2s ease forwards;
+  animation: elo-float 0.84s ease forwards;
 }
 
 .elo-change.positive {
@@ -1046,7 +1046,7 @@ button {
   opacity: 0.4;
   background:
     conic-gradient(from 0deg, var(--secondary) 0 8deg, transparent 8deg 22deg, var(--secondary) 22deg 30deg, transparent 30deg 44deg, var(--secondary) 44deg 52deg, transparent 52deg 66deg, var(--secondary) 66deg 74deg, transparent 74deg 88deg, var(--secondary) 88deg 96deg, transparent 96deg 110deg, var(--secondary) 110deg 118deg, transparent 118deg 132deg, var(--secondary) 132deg 140deg, transparent 140deg 154deg, var(--secondary) 154deg 162deg, transparent 162deg 176deg, var(--secondary) 176deg 184deg, transparent 184deg 198deg, var(--secondary) 198deg 206deg, transparent 206deg 220deg, var(--secondary) 220deg 228deg, transparent 228deg 242deg, var(--secondary) 242deg 250deg, transparent 250deg 264deg, var(--secondary) 264deg 272deg, transparent 272deg 286deg, var(--secondary) 286deg 294deg, transparent 294deg 308deg, var(--secondary) 308deg 316deg, transparent 316deg 330deg, var(--secondary) 330deg 338deg, transparent 338deg 352deg, var(--secondary) 352deg 360deg);
-  animation: burst-pop 0.55s ease-out forwards;
+  animation: burst-pop 0.385s ease-out forwards;
 }
 
 .glamour-text {
@@ -1056,7 +1056,7 @@ button {
   font-size: clamp(3.4rem, 11vw, 6rem);
   color: var(--text-strong);
   text-shadow: 2px 2px 0 #fff;
-  animation: text-pop 0.55s ease-out forwards;
+  animation: text-pop 0.385s ease-out forwards;
 }
 
 @keyframes text-pop {
