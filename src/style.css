@@ -1547,26 +1547,56 @@ button {
     flex-direction: column;
   }
 
-  .star-badge {
-    width: 64px;
-    flex-basis: 64px;
+  .pageant-matchup {
+    gap: 6px;
+    width: 100%;
   }
 
-  .star-badge svg {
-    transform: scale(0.7);
+  .star-badge {
+    width: 50px;
+    flex-basis: 50px;
+  }
+
+  .star-badge .star-text {
+    font-size: 1.2rem;
   }
 
   .contestant-info {
-    padding: 8px;
+    padding: 6px;
+    min-width: 0;
   }
 
   .contestant-name {
-    font-size: 1rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .contestant-stats-wrapper {
+    gap: 4px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .stats-reveal-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  .stats-reveal-btn svg {
+    width: 13px;
+    height: 13px;
   }
 
   .contestant-stats {
-    gap: 6px;
+    gap: 4px;
     flex-direction: column;
     align-items: flex-start;
+    min-width: 0;
+  }
+
+  .contestant-stat {
+    font-size: 0.72rem;
   }
 }
