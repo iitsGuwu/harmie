@@ -1,4 +1,5 @@
 // Harmie Charm Arena — Main Application Entry
+import { devLog, devWarn } from './utils/dom.js';
 import './style.css';
 import { CONFIG } from './config.js';
 import {

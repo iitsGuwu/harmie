@@ -27,7 +27,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('supabase.co') || event.request.url.includes('helius')) {
+  if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
   
