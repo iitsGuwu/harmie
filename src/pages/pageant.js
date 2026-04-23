@@ -21,6 +21,28 @@ const MAX_PAIR_ATTEMPTS = 25;
 
 let keyHandler = null;
 
+function openShareIntent(url) {
+  let popup = null;
+  try {
+    popup = window.open(url, '_blank', 'noopener,noreferrer');
+  } catch {
+    /* ignore */
+  }
+  if (popup) return;
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.referrerPolicy = 'no-referrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {
+    showToast('Could not open the share window. Try allowing pop-ups for this site.', 'error');
+  }
+}
+
 export function renderPageant(container, nfts) {
   allNFTs = nfts.filter((n) => n.image);
   votesCast = parseInt(localStorage.getItem('harmies_votes') || '0', 10) || 0;
@@ -169,10 +191,11 @@ function bindPageantEvents() {
   const shareBtn = document.getElementById('pageant-share');
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
-      if (!currentPair[0] || !currentPair[1]) return;
-      const text = `I'm judging the Harmies Pageant! 🔥\n\nCurrent voting streak: ${streakCount}\nWhich of these two is your favorite?\n\nCome cast your votes: https://harmie.xyz`;
+      const hasPair = Boolean(currentPair[0] && currentPair[1]);
+      const streakLine = hasPair ? `Current voting streak: ${streakCount}\n\n` : '';
+      const text = `I'm judging the Harmies Pageant! 🔥\n\n${streakLine}Come cast your votes: https://harmie.xyz`;
       const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-      window.open(url, '_blank');
+      openShareIntent(url);
     });
   }
 
