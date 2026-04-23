@@ -704,6 +704,23 @@ button {
   gap: 8px;
 }
 
+/* Inline Solana logomark + numeric SOL amounts */
+.sol-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  vertical-align: middle;
+}
+
+.sol-amount__num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sol-currency-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
 .nft-price {
   color: var(--positive);
   font-size: 0.82rem;

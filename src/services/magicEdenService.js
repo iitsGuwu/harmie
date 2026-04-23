@@ -15,7 +15,7 @@ let activitiesCacheTime = 0;
  * Paginates through to get all listed items
  */
 export async function fetchListings(onProgress) {
-  if (listingsCache && (Date.now() - listingsCacheTime < CONFIG.CACHE_TTL_MS)) {
+  if (listingsCache && (Date.now() - listingsCacheTime < CONFIG.MARKETPLACE_CACHE_TTL_MS)) {
     return listingsCache;
   }
 
@@ -76,7 +76,7 @@ export async function fetchListings(onProgress) {
  * Fetch recent activities (sales) for the collection
  */
 export async function fetchActivities(onProgress) {
-  if (activitiesCache && (Date.now() - activitiesCacheTime < CONFIG.CACHE_TTL_MS)) {
+  if (activitiesCache && (Date.now() - activitiesCacheTime < CONFIG.MARKETPLACE_CACHE_TTL_MS)) {
     return activitiesCache;
   }
 
@@ -143,13 +143,15 @@ export async function fetchActivities(onProgress) {
  */
 export function mergeMarketplaceData(nfts, listings, sales) {
   for (const nft of nfts) {
-    // Listings
     if (listings[nft.id]) {
       nft.listPrice = listings[nft.id].price;
+    } else {
+      nft.listPrice = null;
     }
-    // Highest sale
     if (sales[nft.id]) {
-      nft.highestSale = sales[nft.id].price;
+      const p = sales[nft.id].price;
+      nft.highestSale =
+        nft.highestSale != null && nft.highestSale > p ? nft.highestSale : p;
     }
   }
   return nfts;

@@ -7,7 +7,12 @@ import {
   primeNFTCache,
   mergeTwoNftRecords,
 } from './services/heliusService.js';
-import { fetchListings, fetchActivities, mergeMarketplaceData } from './services/magicEdenService.js';
+import {
+  fetchListings,
+  fetchActivities,
+  mergeMarketplaceData,
+  invalidateMarketplaceCache,
+} from './services/magicEdenService.js';
 import {
   initSupabase,
   fetchEloScores,
@@ -30,7 +35,9 @@ let retryCount = 0;
 const MAX_RETRIES = 3;
 
 let realtimeChannel = null;
-let refreshInterval = null;
+let marketplaceRefreshInterval = null;
+let eloRefreshInterval = null;
+let lastMarketplaceSync = 0;
 let lastDataRefresh = 0;
 
 // ============================================================
@@ -130,7 +137,7 @@ async function initApp() {
 
     updateLoading('Launching pageant...', 92);
     setupNavigation();
-    setupAutoRefresh();
+    setupDataRefresh();
 
     updateLoading('LET\'S GO!', 100);
     isLoading = false;
@@ -372,6 +379,7 @@ async function handleRoute() {
     case 'gallery': {
       const { renderGallery } = await import('./pages/gallery.js');
       renderGallery(container, allNFTs);
+      void runMarketplaceSync();
       break;
     }
     case 'pageant': {
@@ -472,37 +480,66 @@ function setupRealtimeSubscriptions() {
   });
 }
 
-function setupAutoRefresh() {
-  if (refreshInterval) clearInterval(refreshInterval);
-  refreshInterval = setInterval(async () => {
-    // Don't refresh if tab is hidden
+async function runMarketplaceSync() {
+  if (document.hidden) return;
+  try {
+    invalidateMarketplaceCache();
+    const [listings, activities] = await Promise.allSettled([fetchListings(), fetchActivities()]);
+
+    const listingsData = listings.status === 'fulfilled' ? listings.value : {};
+    const activitiesData = activities.status === 'fulfilled' ? activities.value : {};
+    mergeMarketplaceData(allNFTs, listingsData, activitiesData);
+    writeCachedNFTs(allNFTs);
+
+    lastMarketplaceSync = Date.now();
+    lastDataRefresh = Date.now();
+    await pushDataToCurrentPage();
+    devLog('Marketplace synced at', new Date().toLocaleTimeString());
+  } catch (err) {
+    devWarn('Marketplace sync error:', err);
+  }
+}
+
+async function runEloSync() {
+  if (document.hidden) return;
+  try {
+    const eloData = await fetchEloScores();
+    mergeEloData(allNFTs, eloData);
+    writeCachedNFTs(allNFTs);
+    lastDataRefresh = Date.now();
+    await pushDataToCurrentPage();
+    devLog('ELO synced at', new Date().toLocaleTimeString());
+  } catch (err) {
+    devWarn('ELO sync error:', err);
+  }
+}
+
+let visibilityResyncTimeout = null;
+
+function setupDataRefresh() {
+  if (marketplaceRefreshInterval) clearInterval(marketplaceRefreshInterval);
+  if (eloRefreshInterval) clearInterval(eloRefreshInterval);
+
+  marketplaceRefreshInterval = setInterval(() => {
+    void runMarketplaceSync();
+  }, CONFIG.MARKETPLACE_REFRESH_MS);
+
+  eloRefreshInterval = setInterval(() => {
+    void runEloSync();
+  }, CONFIG.ELO_REFRESH_MS);
+
+  document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
-    try {
-      const [listings, activities, eloData] = await Promise.allSettled([
-        fetchListings(),
-        fetchActivities(),
-        fetchEloScores(),
-      ]);
-
-      const listingsData = listings.status === 'fulfilled' ? listings.value : {};
-      const activitiesData = activities.status === 'fulfilled' ? activities.value : {};
-      const elo = eloData.status === 'fulfilled' ? eloData.value : {};
-
-      mergeMarketplaceData(allNFTs, listingsData, activitiesData);
-      mergeEloData(allNFTs, elo);
-      writeCachedNFTs(allNFTs);
-
-      pushDataToCurrentPage();
-      lastDataRefresh = Date.now();
-      devLog('Data refreshed at', new Date().toLocaleTimeString());
-    } catch (err) {
-      devWarn('Auto-refresh error:', err);
-    }
-  }, CONFIG.CACHE_TTL_MS);
+    if (visibilityResyncTimeout) clearTimeout(visibilityResyncTimeout);
+    visibilityResyncTimeout = setTimeout(() => {
+      void runMarketplaceSync();
+    }, 400);
+  });
 }
 
 window.addEventListener('beforeunload', () => {
-  if (refreshInterval) clearInterval(refreshInterval);
+  if (marketplaceRefreshInterval) clearInterval(marketplaceRefreshInterval);
+  if (eloRefreshInterval) clearInterval(eloRefreshInterval);
   if (realtimeChannel && typeof realtimeChannel.unsubscribe === 'function') {
     try { realtimeChannel.unsubscribe(); } catch { /* ignore */ }
   }

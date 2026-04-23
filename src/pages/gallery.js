@@ -6,6 +6,7 @@ import {
   FALLBACK_IMAGE,
   debounce,
 } from '../utils/dom.js';
+import { solAmountHtml } from '../utils/solanaCurrencyIcon.js';
 
 let currentNFTs = [];
 let displayedCount = 0;
@@ -105,7 +106,7 @@ export function renderGallery(container, nfts) {
           </div>
           <div class="stat-badge">
             <span>Floor:</span>
-            <span class="stat-value" id="stat-floor">${escapeHtml(getFloorPrice(nfts))}</span>
+            <span class="stat-value sol-amount" id="stat-floor">${getFloorPriceHtml(nfts)}</span>
           </div>
         </div>
       </div>
@@ -250,8 +251,13 @@ function createNFTCard(nft) {
   card.setAttribute('aria-label', `Open details for ${nft.name || 'Harmie'}`);
 
   const rankClass = nft.rank <= 3 ? 'top-3' : nft.rank <= 10 ? 'top-10' : '';
-  const priceText = nft.listPrice != null ? `◎ ${Number(nft.listPrice).toFixed(2)}` : 'Unlisted';
-  const saleText = nft.highestSale ? `Highest: ◎ ${Number(nft.highestSale).toFixed(2)}` : '';
+  const listPriceBlock =
+    nft.listPrice != null
+      ? `<span class="sol-amount">${solAmountHtml(escapeHtml(Number(nft.listPrice).toFixed(2)))}</span>`
+      : escapeHtml('Unlisted');
+  const saleBlock = nft.highestSale
+    ? `Highest: <span class="sol-amount">${solAmountHtml(escapeHtml(Number(nft.highestSale).toFixed(2)))}</span>`
+    : '';
   const rankText = nft.rank ? `#${nft.rank}` : '—';
 
   card.innerHTML = `
@@ -265,10 +271,10 @@ function createNFTCard(nft) {
     <div class="nft-card-info">
       <div class="nft-card-name">${escapeHtml(nft.name || 'Harmie')}</div>
       <div class="nft-card-meta">
-        <span class="nft-price">${escapeHtml(priceText)}</span>
+        <span class="nft-price">${listPriceBlock}</span>
         <span class="nft-rank-badge ${rankClass}">${escapeHtml(rankText)}</span>
       </div>
-      ${saleText ? `<div class="nft-highest-sale">${escapeHtml(saleText)}</div>` : ''}
+      ${saleBlock ? `<div class="nft-highest-sale">${saleBlock}</div>` : ''}
     </div>
   `;
 
@@ -283,17 +289,35 @@ function createNFTCard(nft) {
   return card;
 }
 
-function getFloorPrice(nfts) {
+function getFloorPriceHtml(nfts) {
   const listed = nfts.filter((n) => n.listPrice != null && n.listPrice > 0);
-  if (listed.length === 0) return '—';
+  if (listed.length === 0) return escapeHtml('—');
   const floor = Math.min(...listed.map((n) => n.listPrice));
-  return `◎ ${floor.toFixed(2)}`;
+  return solAmountHtml(escapeHtml(floor.toFixed(2)));
+}
+
+function updateGalleryHeaderStats(nfts) {
+  const totalEl = document.getElementById('stat-total');
+  const listedEl = document.getElementById('stat-listed');
+  const floorEl = document.getElementById('stat-floor');
+  if (!totalEl || !listedEl || !floorEl) return;
+
+  const totalCount = nfts.length;
+  const listedCount = nfts.filter(
+    (n) => n.listPrice !== null && n.listPrice !== undefined,
+  ).length;
+
+  totalEl.textContent = String(totalCount);
+  listedEl.textContent = String(listedCount);
+  floorEl.innerHTML = getFloorPriceHtml(nfts);
 }
 
 export function updateGalleryData(nfts) {
   currentNFTs = [...nfts];
   const grid = document.getElementById('nft-grid');
   if (!grid) return;
+
+  updateGalleryHeaderStats(nfts);
 
   // Preserve scroll position to avoid jump from full re-render
   const scrollY = window.scrollY;

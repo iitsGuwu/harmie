@@ -34,8 +34,15 @@ export const CONFIG = {
   MAX_VOTES_PER_DAY: 500,
   DUPLICATE_PAIR_COOLDOWN_HOURS: 24,
   
-  // Cache
-  CACHE_TTL_MS: 5 * 60 * 1000, // 5 minutes
+  // Caching / refresh: marketplace data (listings, recent sales) updates often;
+  // ELO from Supabase can stay on a gentler cadence to avoid extra load.
+  CACHE_TTL_MS: 5 * 60 * 1000, // legacy default; ME in-memory uses MARKETPLACE_CACHE_TTL_MS
+  /** How long Magic Eden in-memory response is reused without explicit invalidation */
+  MARKETPLACE_CACHE_TTL_MS: 50 * 1000,
+  /** Poll listings + sales activity (full merge + gallery refresh) */
+  MARKETPLACE_REFRESH_MS: 60 * 1000,
+  /** ELO / rank sync from Supabase */
+  ELO_REFRESH_MS: 5 * 60 * 1000,
   
   // Marketplace links
   TENSOR_COLLECTION_URL: 'https://www.tensor.trade/trade/c7d45db9-0726-459c-bc42-afc8ee32e10a',

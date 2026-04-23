@@ -1,6 +1,7 @@
 // NFT Detail Modal
 import { CONFIG } from '../config.js';
 import { escapeHtml, safeUrl, attachImageFallback, FALLBACK_IMAGE } from '../utils/dom.js';
+import { solAmountHtml } from '../utils/solanaCurrencyIcon.js';
 
 let activeEscHandler = null;
 let lastFocusedElement = null;
@@ -45,10 +46,13 @@ export function showNFTModal(nft) {
   ensureListeners();
   lastFocusedElement = document.activeElement;
 
-  const priceText = nft.listPrice !== null && nft.listPrice !== undefined
-    ? `◎ ${Number(nft.listPrice).toFixed(2)}`
-    : 'Unlisted';
-  const saleText = nft.highestSale ? `◎ ${Number(nft.highestSale).toFixed(2)}` : '—';
+  const listPriceBlock =
+    nft.listPrice !== null && nft.listPrice !== undefined
+      ? `<span class="sol-amount">${solAmountHtml(escapeHtml(Number(nft.listPrice).toFixed(2)))}</span>`
+      : escapeHtml('Unlisted');
+  const saleBlock = nft.highestSale
+    ? `<span class="sol-amount">${solAmountHtml(escapeHtml(Number(nft.highestSale).toFixed(2)))}</span>`
+    : '—';
   const winRate = nft.totalMatches > 0
     ? Math.round((nft.wins / nft.totalMatches) * 100)
     : 0;
@@ -80,11 +84,11 @@ export function showNFTModal(nft) {
         </div>
         <div class="modal-stat">
           <div class="modal-stat-label">Listed Price</div>
-          <div class="modal-stat-value ${priceValueClass}">${escapeHtml(priceText)}</div>
+          <div class="modal-stat-value ${priceValueClass}">${listPriceBlock}</div>
         </div>
         <div class="modal-stat">
           <div class="modal-stat-label">Highest Sale</div>
-          <div class="modal-stat-value">${escapeHtml(saleText)}</div>
+          <div class="modal-stat-value">${saleBlock}</div>
         </div>
         <div class="modal-stat">
           <div class="modal-stat-label">Win Rate</div>
