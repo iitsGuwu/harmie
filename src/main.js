@@ -22,6 +22,12 @@ const NFT_DYN_CACHE_KEY = 'harmies_dyn_v4';
 const NFT_META_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const NFT_DYN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache for dynamic data
 
+let allNFTs = [];
+let currentPage = 'pageant';
+let isLoading = true;
+let retryCount = 0;
+const MAX_RETRIES = 3;
+
 let realtimeChannel = null;
 let refreshInterval = null;
 let lastDataRefresh = 0;
