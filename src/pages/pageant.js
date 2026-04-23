@@ -272,7 +272,7 @@ function loadNewMatchup() {
   if (matchupContainer) {
     matchupContainer.classList.remove('fade-out-scale');
     matchupContainer.classList.add('fade-in-scale');
-    setTimeout(() => matchupContainer.classList.remove('fade-in-scale'), 210);
+    setTimeout(() => matchupContainer.classList.remove('fade-in-scale'), 147);
   }
 
   renderMatchup();
@@ -415,9 +415,9 @@ async function handleVote(side) {
   setTimeout(() => {
     const container = document.getElementById('pageant-matchup');
     if (container) container.classList.add('fade-out-scale');
-  }, 840);
+  }, 588);
 
-  setTimeout(() => loadNewMatchup(), 1050);
+  setTimeout(() => loadNewMatchup(), 735);
 }
 
 function rollback(winner, loser, snapshot, message) {
@@ -478,7 +478,7 @@ function showGlamourEffect() {
   setTimeout(() => {
     overlay.classList.add('hidden');
     overlay.innerHTML = '';
-  }, 490);
+  }, 343);
 }
 
 function showEloChange(element, text, isPositive) {
@@ -490,7 +490,7 @@ function showEloChange(element, text, isPositive) {
   element.style.position = 'relative';
   element.appendChild(el);
 
-  setTimeout(() => el.remove(), 910);
+  setTimeout(() => el.remove(), 637);
 }
 
 export function updatePageantData(nfts) {
