@@ -1,6 +1,6 @@
-// Solana logomark (three bands) as inline SVG — inherits `color` via currentColor.
+// Official Solana logomark (three bars), viewBox 0 0 398 312 — fills use currentColor for theme.
 
-export const SOL_CURRENCY_SVG = `<svg class="sol-currency-icon" viewBox="0 0 16 12" width="0.88em" height="0.66em" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><path d="M0 0h10.3L8.2 2.1H0V0z" opacity="0.55"/><path d="M0 4.5h5.9L3.8 6.6H0V4.5z" opacity="0.82"/><path d="M0 9h10.3L8.2 11.1H0V9z"/></g></svg>`;
+export const SOL_CURRENCY_SVG = `<svg class="sol-currency-icon" viewBox="0 0 398 312" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill="currentColor" d="M64.6325 237.918C67.0659 235.486 70.3651 234.121 73.8051 234.121H391.203C396.985 234.121 399.879 241.112 395.789 245.199L333.072 307.866C330.638 310.298 327.339 311.664 323.899 311.664H6.50165C0.719649 311.664 -2.17481 304.672 1.91531 300.585L64.6325 237.918Z"/><path fill="currentColor" d="M64.6325 3.7973C67.0659 1.36583 70.3651 0 73.8051 0H391.203C396.985 0 399.879 6.99175 395.789 11.0786L333.072 73.7458C330.638 76.1773 327.339 77.5431 323.899 77.5431H6.50165C0.719649 77.5431 -2.17481 70.5514 1.91531 66.4645L64.6325 3.7973Z"/><path fill="currentColor" d="M333.072 120.112C330.638 117.68 327.339 116.315 323.899 116.315H6.50164C0.719647 116.315 -2.17481 123.306 1.91531 127.393L64.6325 190.06C67.0659 192.492 70.3651 193.858 73.8051 193.858H391.203C396.985 193.858 399.879 186.866 395.789 182.779L333.072 120.112Z"/></svg>`;
 
 /** @param {string} amountEscaped already-escaped numeric string */
 export function solAmountHtml(amountEscaped) {

@@ -719,6 +719,9 @@ button {
 .sol-currency-icon {
   flex-shrink: 0;
   display: block;
+  width: 0.88em;
+  height: auto;
+  aspect-ratio: 398 / 312;
 }
 
 .nft-price {
