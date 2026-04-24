@@ -40,7 +40,6 @@ function getOrCreateSupabaseClient() {
 }
 
 let supabase = null;
-let lastVoteTime = 0;
 let isInitialized = false;
 let authSessionReady = false;
 
@@ -164,11 +163,6 @@ export async function submitVote(winnerId, loserId) {
     return { error: 'Still connecting — try again in a moment.' };
   }
 
-  const now = Date.now();
-  if (now - lastVoteTime < CONFIG.VOTE_COOLDOWN_MS) {
-    return { error: 'Too fast! Wait a moment between votes.' };
-  }
-
   try {
     const { data, error } = await supabase.rpc('submit_vote', {
       p_winner_id: winnerId,
@@ -185,7 +179,7 @@ export async function submitVote(winnerId, loserId) {
         return { error: 'You already voted on this matchup recently!' };
       }
       if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('too fast')) {
-        return { error: 'Slow down — try again in a moment.' };
+        return { error: 'Please try again in a moment.' };
       }
       if (msg.includes('daily vote limit')) {
         return { error: 'Daily vote limit reached. Come back tomorrow!' };
@@ -196,7 +190,6 @@ export async function submitVote(winnerId, loserId) {
       return { error: error?.message || data?.error || 'Failed to submit vote' };
     }
 
-    lastVoteTime = now;
     return data;
   } catch (err) {
     devWarn('Vote error:', err);

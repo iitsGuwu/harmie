@@ -30,7 +30,6 @@ export const CONFIG = {
   ELO_THRESHOLD: 100,
   
   // Anti-rigging
-  VOTE_COOLDOWN_MS: 3000,
   MAX_VOTES_PER_DAY: 500,
   DUPLICATE_PAIR_COOLDOWN_HOURS: 24,
   
