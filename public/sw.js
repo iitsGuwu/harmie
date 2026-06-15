@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harmies-cache-v1';
+const CACHE_NAME = 'harmies-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -68,7 +68,7 @@ self.addEventListener('fetch', (event) => {
         }
 
         caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, response);
+          cache.put(event.request, response.clone());
         });
         return response;
       }).catch(() => null);
