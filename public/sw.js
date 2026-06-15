@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harmies-cache-v2';
+const CACHE_NAME = 'harmies-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -27,53 +27,44 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (!event.request.url.startsWith(self.location.origin)) {
-    return;
-  }
+  // Only handle same-origin GET requests
+  if (event.request.method !== 'GET') return;
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
-  // Network-First for index.html or document requests to ensure users always get the latest hashes
-  const isDoc = event.request.mode === 'navigate' || event.request.url.endsWith('/') || event.request.url.endsWith('index.html');
-  
-  if (isDoc) {
+  // Network-First for document/navigation requests
+  if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, copy);
-            });
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
-  
+
+  // Cache-First for all other assets (JS, CSS, images, fonts)
+  // No background revalidation — eliminates body-consumed race conditions
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Fetch fresh version in background
-      const networkFetch = fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || event.request.method !== 'GET') {
-          return response;
-        }
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
 
-        // Avoid caching SPA fallback html redirect for missing assets
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-          return response;
+      return fetch(event.request).then((response) => {
+        // Only cache successful, same-origin (basic) responses
+        // Never cache HTML fallbacks for missing hashed assets
+        if (response.ok && response.type === 'basic') {
+          const ct = response.headers.get('content-type') || '';
+          if (!ct.includes('text/html')) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
         }
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, response.clone());
-        });
         return response;
-      }).catch(() => null);
-
-      return cachedResponse || networkFetch;
+      });
     })
   );
 });
