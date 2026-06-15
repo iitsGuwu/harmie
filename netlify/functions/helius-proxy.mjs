@@ -7,7 +7,7 @@ import {
   rateLimitHelius,
 } from './proxy-utils.mjs';
 
-const HELIUS_ALLOWED_METHODS = new Set(['getAssetsByGroup', 'searchAssets']);
+const HELIUS_ALLOWED_METHODS = new Set(['getAssetsByGroup', 'searchAssets', 'getBalance']);
 
 export default async (request) => {
   const baseHeaders = {
