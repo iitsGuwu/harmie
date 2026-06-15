@@ -6,7 +6,7 @@ Vote for your favorite Harmies in head-to-head charm battles, browse the full li
 
 ## Features
 
-- **Battle Arena** — Pick your favorite in head-to-head matchups. Votes update ELO scores in real time.
+- **Pageant** — Pick your favorite in head-to-head matchups. Votes update ELO scores in real time.
 - **Gallery** — Browse, sort, and search all Harmies by price, highest sale, rank, number, or background.
 - **Leaderboard** — Community rankings with podium display and detailed stats table.
 - **NFT Detail Modal** — View stats, marketplace links (Tensor & Magic Eden), and traits for any Harmie.

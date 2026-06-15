@@ -29,10 +29,13 @@ const NFT_META_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const NFT_DYN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours warm cache for dynamic data
 
 let allNFTs = [];
-let currentPage = 'pageant';
+let currentPage = 'home';
 let isLoading = true;
 let retryCount = 0;
 const MAX_RETRIES = 3;
+
+// Static pages render instantly and need no NFT dataset.
+const STATIC_PAGES = new Set(['home', 'grow']);
 
 let realtimeChannel = null;
 let marketplaceRefreshInterval = null;
@@ -96,17 +99,48 @@ function applyThemeMode(theme) {
   if (themeMeta) themeMeta.setAttribute('content', themeColor);
 }
 
-async function initApp() {
-  const loadingBar = document.getElementById('loading-bar');
-  const loadingText = document.getElementById('loading-text');
+let appRevealed = false;
+
+function revealApp() {
+  if (appRevealed) return;
+  appRevealed = true;
   const loadingScreen = document.getElementById('loading-screen');
   const app = document.getElementById('app');
+  setTimeout(() => {
+    if (loadingScreen) loadingScreen.classList.add('fade-out');
+    if (app) app.classList.remove('hidden');
+    setTimeout(() => {
+      if (loadingScreen) loadingScreen.style.display = 'none';
+    }, 600);
+  }, 350);
+}
+
+function initApp() {
+  const loadingBar = document.getElementById('loading-bar');
+  const loadingText = document.getElementById('loading-text');
 
   function updateLoading(text, percent) {
     if (loadingText) loadingText.textContent = text;
     if (loadingBar) loadingBar.style.width = `${percent}%`;
   }
 
+  setupNavigation();
+
+  const startingHash = window.location.hash.replace('#', '') || 'home';
+
+  // Home / grow need no NFT data — paint them immediately and hydrate the
+  // collection in the background so later navigation to data pages is instant.
+  if (STATIC_PAGES.has(startingHash)) {
+    handleRoute().catch(devWarn);
+    revealApp();
+    loadData(updateLoading).catch((err) => devWarn('Background data load failed:', err));
+    return;
+  }
+
+  loadData(updateLoading, { reveal: true });
+}
+
+async function loadData(updateLoading, { reveal = false } = {}) {
   try {
     updateLoading('Connecting to the pageant...', 10);
     const supabaseInitPromise = initSupabase().catch(() => false);
@@ -124,9 +158,8 @@ async function initApp() {
       });
     }
 
-    const startingHash = window.location.hash.replace('#', '') || 'pageant';
-    const needsSupabaseImmediately = startingHash === 'pageant';
-    if (needsSupabaseImmediately) {
+    const startingHash = window.location.hash.replace('#', '') || 'home';
+    if (startingHash === 'pageant') {
       await supabaseInitPromise;
     }
 
@@ -135,23 +168,18 @@ async function initApp() {
       return;
     }
 
-    updateLoading('Launching pageant...', 92);
-    setupNavigation();
     setupDataRefresh();
-
-    updateLoading('LET\'S GO!', 100);
     isLoading = false;
-    
-    // Defer async route rendering
-    handleRoute().catch(devWarn);
+    updateLoading('LET\'S GO!', 100);
 
-    setTimeout(() => {
-      if (loadingScreen) loadingScreen.classList.add('fade-out');
-      if (app) app.classList.remove('hidden');
-      setTimeout(() => {
-        if (loadingScreen) loadingScreen.style.display = 'none';
-      }, 600);
-    }, 350);
+    // Render the active route now that data is ready. Static pages are already
+    // on screen, so only (re)render if the user is on a data page.
+    const activeHash = window.location.hash.replace('#', '') || 'home';
+    if (!STATIC_PAGES.has(activeHash)) {
+      handleRoute().catch(devWarn);
+    }
+
+    if (reveal) revealApp();
 
     hydrateSecondaryData(supabaseInitPromise, !!cached).catch((err) => {
       devWarn('Background hydration error:', err);
@@ -162,7 +190,7 @@ async function initApp() {
     if (retryCount < MAX_RETRIES) {
       const delayMs = Math.min(30000, 2000 * Math.pow(2, retryCount - 1));
       updateLoading(`Hit a snag. Retrying (${retryCount}/${MAX_RETRIES})...`, 0);
-      setTimeout(() => initApp(), delayMs);
+      setTimeout(() => loadData(updateLoading, { reveal }), delayMs);
     } else {
       updateLoading('Failed to load. Please refresh and try again.', 0);
     }
@@ -351,9 +379,12 @@ function setupNavigation() {
 }
 
 async function handleRoute() {
-  const hash = window.location.hash.replace('#', '') || 'pageant';
-  const validPages = ['gallery', 'pageant', 'leaderboard'];
-  currentPage = validPages.includes(hash) ? hash : 'pageant';
+  const hash = window.location.hash.replace('#', '') || 'home';
+  const validPages = ['home', 'grow', 'gallery', 'pageant', 'leaderboard'];
+  currentPage = validPages.includes(hash) ? hash : 'home';
+
+  // Expose the active route so page-specific backgrounds can key off it.
+  document.documentElement.setAttribute('data-page', currentPage);
 
   document.querySelectorAll('.nav-link').forEach((link) => {
     link.classList.toggle('active', link.dataset.page === currentPage);
@@ -364,6 +395,20 @@ async function handleRoute() {
 
   const container = document.getElementById('page-container');
   if (!container) return;
+
+  // Static pages render immediately — they don't depend on the NFT dataset.
+  if (currentPage === 'home') {
+    const { renderHome } = await import('./pages/home.js');
+    renderHome(container);
+    scrollToTop();
+    return;
+  }
+  if (currentPage === 'grow') {
+    const { renderGrow } = await import('./pages/grow.js');
+    renderGrow(container);
+    scrollToTop();
+    return;
+  }
 
   if (isLoading) {
     container.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
@@ -394,6 +439,10 @@ async function handleRoute() {
     }
   }
 
+  scrollToTop();
+}
+
+function scrollToTop() {
   const prefersReducedMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
