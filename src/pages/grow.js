@@ -64,7 +64,7 @@ export function renderGrow(container) {
         <h1 class="section-title">GROW</h1>
         <p class="section-subtitle">Community funding rounds for the next Harmie builds. Back a proposal — when it hits its goal, we ship it.</p>
         <div class="grow-note">
-          Funding rounds cover builds <strong>01</strong> and <strong>02</strong>. After that, new project proposals and launches move to the <strong>DAO</strong>.
+          "Grow" funding rounds cover builds <strong>01</strong> and <strong>02</strong>. After that, new project proposals and launches move to the <strong>DAO</strong>.
         </div>
       </header>
 
