@@ -1927,11 +1927,15 @@ html[data-page='home'] body::after {
 
 .proposal-card {
   position: relative;
-  padding: 22px 24px 34px;
+  padding: 22px 24px;
   border: 3px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow-card), var(--shadow-soft);
+}
+
+.proposal-card-has-info {
+  padding-bottom: 38px;
 }
 
 .proposal-card-upcoming {
@@ -2243,7 +2247,11 @@ html[data-page='home'] body::after {
   }
 
   .proposal-card {
-    padding: 18px 18px 28px;
+    padding: 18px;
+  }
+
+  .proposal-card-has-info {
+    padding-bottom: 30px;
   }
 
   .proposal-top {

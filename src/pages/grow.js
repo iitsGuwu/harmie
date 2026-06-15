@@ -167,12 +167,13 @@ function renderProposal(p) {
   const tagClass = p.hasFunding ? 'tag-funding' : 'tag-upcoming';
   const tag = `<span class="proposal-tag ${tagClass}">${escapeHtml(p.tagLabel)}</span>`;
   const body = p.hasFunding ? renderFunding(p) : renderUpcoming(p);
-  const moreInfoBtn = (p.id === 'trade' || p.id === 'dao')
+  const hasMoreInfo = p.id === 'trade' || p.id === 'dao';
+  const moreInfoBtn = hasMoreInfo
     ? `<button class="more-info-btn" data-action="more-info" data-id="${escapeHtml(p.id)}">More Info</button>`
     : '';
 
   return `
-    <article class="proposal-card${p.hasFunding ? '' : ' proposal-card-upcoming'}" data-proposal="${escapeHtml(p.id)}">
+    <article class="proposal-card${p.hasFunding ? '' : ' proposal-card-upcoming'}${hasMoreInfo ? ' proposal-card-has-info' : ''}" data-proposal="${escapeHtml(p.id)}">
       <div class="proposal-top">
         <span class="proposal-index" aria-hidden="true">${escapeHtml(p.index)}</span>
         <div class="proposal-heading">
