@@ -21,9 +21,10 @@ const PROPOSALS = [
     blurb:
       'A Neuko asset only marketplace — buy and sell Badges and Harmies using $GBOY or SOL, all in one place. Zero marketplace fees. ',
     hasFunding: true,
-    tagLabel: 'Funding now',
+    tagLabel: 'Building',
     wallet: 'egrDuJh8qtdC1R9uJ7za2Y2rD5diXVA9hazHDcLp7jB',
     targetSol: 4,
+    isFunded: true,
   },
   {
     id: 'dao',
@@ -198,10 +199,21 @@ function renderFunding(p) {
   let state;
   let status;
   let goal;
+  let valuenow = '0';
+  let fillWidth = '0%';
+
   if (hasWallet) {
-    state = 'loading';
-    status = 'Loading balance…';
-    goal = hasTarget ? `Goal: ${formatSol(p.targetSol)} SOL` : 'Goal: TBA';
+    if (p.isFunded) {
+      state = 'building';
+      status = '🚧 Build in progress';
+      goal = `${formatSol(p.targetSol)} / ${formatSol(p.targetSol)} SOL`;
+      valuenow = '100';
+      fillWidth = '100%';
+    } else {
+      state = 'loading';
+      status = 'Loading balance…';
+      goal = hasTarget ? `Goal: ${formatSol(p.targetSol)} SOL` : 'Goal: TBA';
+    }
   } else {
     state = 'pending';
     status = p.pendingLabel || 'Funding wallet — coming soon';
@@ -214,8 +226,8 @@ function renderFunding(p) {
 
   return `
     <div class="proposal-funding" data-funding="${escapeHtml(p.id)}" data-state="${state}">
-      <div class="funding-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div class="funding-bar-fill" style="width: 0%"></div>
+      <div class="funding-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${valuenow}">
+        <div class="funding-bar-fill" style="width: ${fillWidth}"></div>
       </div>
       <div class="funding-row">
         <span class="funding-status">${escapeHtml(status)}</span>
@@ -243,8 +255,12 @@ async function hydrateBalances() {
     const el = document.querySelector(`[data-funding="${p.id}"]`);
     if (!el) continue;
     try {
-      const balance = await fetchSolBalance(p.wallet);
-      applyFunding(el, balance, p.targetSol);
+      if (p.isFunded) {
+        applyFunding(el, p.targetSol, p.targetSol);
+      } else {
+        const balance = await fetchSolBalance(p.wallet);
+        applyFunding(el, balance, p.targetSol);
+      }
     } catch (err) {
       devWarn('Grow: balance fetch failed for', p.id, err);
       setFundingError(el);
